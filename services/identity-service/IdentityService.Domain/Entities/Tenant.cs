@@ -3,6 +3,7 @@ using Shared.Domain.Common;
 
 namespace IdentityService.Domain.Entities;
 
+//sealed class means no other class can inherit
 public sealed class Tenant : AggregateRoot<Guid>
 {
     private Tenant() {}
@@ -39,6 +40,7 @@ public sealed class Tenant : AggregateRoot<Guid>
         return new Tenant(Guid.NewGuid(),name,subdomain,contactEmail);
     }
 
+//Deactivate tenatn instead of delteing , because we want to keep the data for auditing and historical purposes.
     public void Deactivate()
     {
         IsActive = false;

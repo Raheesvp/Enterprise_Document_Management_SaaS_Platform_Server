@@ -4,6 +4,9 @@ using Shared.Domain.Common;
 
 namespace IdentityService.Application.Behaviors;
 
+
+//validation behavior  be catches it .Login Command Builder never even called.
+//api returns 400 Bad Request with validation error message without hitting the handler.
 public sealed class ValidationBehavior<TRequest, TResponse>
     : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>

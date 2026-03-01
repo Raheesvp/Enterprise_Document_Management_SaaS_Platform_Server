@@ -8,7 +8,7 @@ namespace IdentityService.Domain.Entities;
    public sealed class User : AggregateRoot<Guid>
 
 {
-    private readonly List<RefreshToken> _refreshTokens = new();
+    private readonly List<RefreshToken> _refreshTokens = new(); //no one can hack the refresh token to hack.every time new token is added.
 
     private User()  {}
 
@@ -41,6 +41,7 @@ namespace IdentityService.Domain.Entities;
 
     public IReadOnlyCollection<RefreshToken> RefreshTokens => _refreshTokens.AsReadOnly();
 
+    //Safety first approach to user creation.Developer assigns a role ,new user gets lowest permissible .
     public static User Create(
         Guid tenantId,
         string email,
@@ -66,6 +67,8 @@ namespace IdentityService.Domain.Entities;
         RevokeAllRefreshTokens("Replaced by new token");
         _refreshTokens.Add(token);
     }
+
+    //check if token is provided by user is actually valid.If user clicks the logout button , we will kill the token .
 
     public RefreshToken? GetActiveRefreshToken(string token)
         => _refreshTokens.FirstOrDefault(t =>

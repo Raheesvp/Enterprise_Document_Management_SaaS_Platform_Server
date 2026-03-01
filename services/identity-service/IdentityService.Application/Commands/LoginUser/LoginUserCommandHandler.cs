@@ -28,6 +28,9 @@ public sealed class LoginUserCommandHandler
         _jwtService = jwtService;
     }
 
+    //email doesnot exist or password is wrong, we return the same error to prevent attackers from knowing which part is incorrect.
+    //hackers use this technique to find valid emails in the system by analyzing error messages or response times.
+    //perform a verification step so the response time is consistent whether the email exists or not, making it harder for attackers to infer valid emails based on timing differences.
     public async Task<Result<AuthResponseDto>> Handle(
         LoginUserCommand command,
         CancellationToken cancellationToken)

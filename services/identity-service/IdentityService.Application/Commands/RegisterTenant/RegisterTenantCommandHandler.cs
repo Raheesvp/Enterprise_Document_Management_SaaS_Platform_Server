@@ -12,9 +12,9 @@ namespace IdentityService.Application.Commands.RegisterTenant;
 public sealed class RegisterTenantCommandHandler
     : IRequestHandler<RegisterTenantCommand, Result<TenantDto>>
 {
-    private readonly ITenantRepository _tenantRepo;
-    private readonly IUserRepository _userRepo;
-    private readonly IPasswordService _passwordService;
+    private readonly ITenantRepository _tenantRepo; //check if subdomain is availabe and create tenant.
+    private readonly IUserRepository _userRepo; // save the new admin user for this tenant.
+    private readonly IPasswordService _passwordService; // encrypt password using bcrypt.
 
     public RegisterTenantCommandHandler(
         ITenantRepository tenantRepo,
