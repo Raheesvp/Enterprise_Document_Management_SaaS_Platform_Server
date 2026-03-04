@@ -1,8 +1,9 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "IdentityService.API",
-    "version": "1.0"
+    "title": "Identity Service API",
+    "description": "Identity and Access Management for FinTrack",
+    "version": "v1"
   },
   "paths": {
     "/api/identity/register": {
@@ -175,6 +176,19 @@
         },
         "additionalProperties": false
       }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Enter JWT token. Example: Bearer {your token}",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "Bearer": [ ]
+    }
+  ]
 }

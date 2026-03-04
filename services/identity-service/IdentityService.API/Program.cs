@@ -31,6 +31,14 @@ builder.Services.AddHealthChecks()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
+
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Identity Service API",
+        Version = "v1",
+        Description = "Identity and Access Management for FinTrack"
+    });
+
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -57,6 +65,19 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowGateway", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5000",
+                "http://localhost:5010"
+                )
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 var app = builder.Build();
 
 // ── Auto-migrate on startup ────────────────────────────────────
@@ -68,19 +89,24 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ── Middleware Pipeline ────────────────────────────────────────
-app.UseMiddleware<ExceptionMiddleware>();
-app.UseSerilogRequestLogging();
+// ✅ Correct order
+app.UseMiddleware<ExceptionMiddleware>();    // 1. catch all exceptions first
+
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>                      // ✅ c => lambda syntax
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service API v1");
+        c.RoutePrefix = "swagger";
+    });
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-app.MapHealthChecks("/health");
-
+app.UseSerilogRequestLogging();             // 3. log requests
+app.UseCors("AllowGateway");               // 4. CORS before auth
+app.UseAuthentication();                    // 5. validate JWT
+app.UseAuthorization();                     // 6. check permissions
+app.MapControllers();                       // 7. route to controllers
+app.MapHealthChecks("/health");             // 8. health endpoint
 app.Run();

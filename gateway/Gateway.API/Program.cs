@@ -1,5 +1,6 @@
 using Gateway.API.Extensions;
 using Gateway.API.Middleware;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Serilog;
 
@@ -25,12 +26,14 @@ builder.Services.AddGatewayRateLimiting();
 
 // ── Health Checks ──────────────────────────────────────────────────────────
 builder.Services.AddHealthChecks();
+builder.Services.AddEndpointsApiExplorer();
 
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Identity Service API", Version = "v1" });
+   
 
+ 
     // 1. Define the Security Scheme (How the lock button works)
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
@@ -65,13 +68,29 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:3000",  // React dev server
-                "http://localhost:5173")  // Vite dev server
+                "http://localhost:5173"
+                )  // Vite dev server
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());         // Required for SignalR
 });
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        // Same-origin path via gateway proxy (avoids browser CORS issues)
+        c.SwaggerEndpoint("/identity-swagger/v1/swagger.json", "Identity Service API");
+
+        // This shows the Gateway's own (empty) definition
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service(via Gateway)");
+
+        c.RoutePrefix = "swagger";
+    });
+}
 
 // ── Middleware Pipeline (ORDER MATTERS) ────────────────────────────────────
 // 1. Serilog request logging — log every request
@@ -93,9 +112,9 @@ app.UseAuthorization();
 app.UseMiddleware<TenantResolutionMiddleware>();
 
 // 7. Health check endpoint
-app.MapHealthChecks("/health");
 
 // 8. YARP — forward to downstream services
+app.MapHealthChecks("/health");
 app.MapReverseProxy();
 
 app.Run();
