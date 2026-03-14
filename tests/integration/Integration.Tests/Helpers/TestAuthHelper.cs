@@ -3,51 +3,80 @@ using System.Text.Json;
 
 namespace Integration.Tests.Helpers;
 
-// TestAuthHelper — registers tenant and gets JWT token
-// Used by all integration tests that need authentication
 public static class TestAuthHelper
 {
-    // Registers a new tenant and returns JWT token
-    // Each test gets its own tenant — fully isolated
     public static async Task<string> RegisterAndLoginAsync(
         HttpClient client,
         string tenantName = "TestTenant",
         string email      = "admin@test.com",
         string password   = "Test@123456!")
     {
+        // Subdomain must match: ^[a-z0-9-]+$
+        // Only lowercase letters, numbers and hyphens
+        var uniqueId  = Guid.NewGuid().ToString("N")
+            .Substring(0, 8).ToLower();
+        var subdomain = $"test-{uniqueId}";
+
         // Step 1 — Register tenant
         var registerPayload = new
         {
-            tenantName   = tenantName,
-            email        = email,
-            password     = password,
-            firstName    = "Test",
-            lastName     = "Admin"
+            tenantName    = tenantName,
+            subdomain     = subdomain,
+            contactEmail  = email,
+            adminFullName = "Test Admin",
+            adminEmail    = email,
+            adminPassword = password
         };
 
         var registerResponse = await client.PostAsJsonAsync(
-            "http://localhost:5001/api/auth/register",
+            "http://localhost:5001/api/identity/register",
             registerPayload);
+
+        if (!registerResponse.IsSuccessStatusCode)
+        {
+            var err = await registerResponse.Content
+                .ReadAsStringAsync();
+            throw new Exception(
+                $"Register failed: " +
+                $"{registerResponse.StatusCode} — {err}");
+        }
 
         // Step 2 — Login and get JWT
         var loginPayload = new
         {
-            email    = email,
-            password = password
+            email     = email,
+            password  = password,
+            subdomain = subdomain
         };
 
         var loginResponse = await client.PostAsJsonAsync(
-            "http://localhost:5001/api/auth/login",
+            "http://localhost:5001/api/identity/login",
             loginPayload);
 
-        loginResponse.EnsureSuccessStatusCode();
+        if (!loginResponse.IsSuccessStatusCode)
+        {
+            var err = await loginResponse.Content
+                .ReadAsStringAsync();
+            throw new Exception(
+                $"Login failed: " +
+                $"{loginResponse.StatusCode} — {err}");
+        }
 
         var content = await loginResponse.Content
             .ReadAsStringAsync();
 
-        var json = JsonSerializer.Deserialize<JsonElement>(content);
+        var json = JsonSerializer.Deserialize<JsonElement>(
+            content,
+            new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
 
-        return json.GetProperty("token").GetString()
-            ?? throw new Exception("Token not found in response");
+        // AuthResponseDto returns AccessToken
+        if (json.TryGetProperty("accessToken", out var tokenProp))
+            return tokenProp.GetString()!;
+
+        throw new Exception(
+            $"AccessToken not found in response: {content}");
     }
 }
