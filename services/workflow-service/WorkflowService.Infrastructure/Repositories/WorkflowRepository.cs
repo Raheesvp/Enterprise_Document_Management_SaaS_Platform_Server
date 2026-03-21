@@ -79,4 +79,16 @@ public sealed class WorkflowRepository : IWorkflowRepository
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<WorkflowInstance>>
+        GetByTenantAsync(
+            Guid tenantId,
+            CancellationToken ct = default)
+    {
+        return await _context.WorkflowInstances
+            .Include(w => w.Stages)
+            .Where(w => w.TenantId == tenantId)
+            .OrderByDescending(w => w.StartedAt)
+            .ToListAsync(ct);
+    }
 }

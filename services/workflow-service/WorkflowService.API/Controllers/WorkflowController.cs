@@ -1,11 +1,12 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Shared.Domain.Common;
 using WorkflowService.Application.Commands.ApproveStage;
 using WorkflowService.Application.Commands.RejectStage;
 using WorkflowService.Application.Commands.StartWorkflow;
 using WorkflowService.Application.Queries.GetWorkflowStatus;
-using Shared.Domain.Common;
+using WorkflowService.Application.Interfaces;
 
 namespace WorkflowService.API.Controllers;
 
@@ -16,13 +17,16 @@ public sealed class WorkflowController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly ITenantContext _tenantContext;
+    private readonly IWorkflowRepository _repository;
 
     public WorkflowController(
         IMediator mediator,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IWorkflowRepository repository)
     {
         _mediator      = mediator;
         _tenantContext = tenantContext;
+        _repository    = repository;
     }
 
     [HttpPost("start")]
@@ -31,14 +35,10 @@ public sealed class WorkflowController : ControllerBase
         CancellationToken ct)
     {
         var result = await _mediator.Send(
-            command with { TenantId = _tenantContext.TenantId },
-            ct);
+            command with { TenantId = _tenantContext.TenantId }, ct);
 
         if (result.IsFailure)
-            return BadRequest(new
-            {
-                error = result.Error.Description
-            });
+            return BadRequest(new { error = result.Error.Description });
 
         return CreatedAtAction(
             nameof(GetStatus),
@@ -52,17 +52,48 @@ public sealed class WorkflowController : ControllerBase
         CancellationToken ct)
     {
         var result = await _mediator.Send(
-            new GetWorkflowStatusQuery(
-                id, _tenantContext.TenantId),
-            ct);
+            new GetWorkflowStatusQuery(id, _tenantContext.TenantId), ct);
 
         if (result.IsFailure)
-            return NotFound(new
-            {
-                error = result.Error.Description
-            });
+            return NotFound(new { error = result.Error.Description });
 
         return Ok(result.Value);
+    }
+
+    // GET /api/workflow/my — list all workflows for this tenant
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyWorkflows(
+        CancellationToken ct)
+    {
+        var workflows = await _repository
+            .GetByTenantAsync(_tenantContext.TenantId, ct);
+
+        var dtos = workflows.Select(w => new
+        {
+            id                = w.Id,
+            tenantId          = w.TenantId,
+            documentId        = w.DocumentId,
+            documentTitle     = w.DocumentTitle,
+            status            = w.Status.ToString(),
+            currentStageOrder = w.CurrentStageOrder,
+            initiatedByUserId = w.InitiatedByUserId,
+            startedAt         = w.StartedAt,
+            completedAt       = w.CompletedAt,
+            stages            = w.Stages.Select(s => new
+            {
+                id               = s.Id,
+                stageOrder       = s.StageOrder,
+                stageName        = s.StageName,
+                assignedToUserId = s.AssignedToUserId,
+                assignedToEmail  = s.AssignedToEmail,
+                status           = s.Status.ToString(),
+                comments         = s.Comments,
+                slaDeadline      = s.SlaDeadline,
+                processedAt      = s.ProcessedAt,
+            }).ToList()
+        });
+
+        return Ok(dtos);
     }
 
     [HttpPost("{id}/approve")]
@@ -71,21 +102,13 @@ public sealed class WorkflowController : ControllerBase
         [FromBody] ApproveStageRequest request,
         CancellationToken ct)
     {
-        var userId = GetUserId();
-
         var result = await _mediator.Send(
             new ApproveStageCommand(
-                id,
-                _tenantContext.TenantId,
-                userId,
-                request.Comments),
-            ct);
+                id, _tenantContext.TenantId,
+                GetUserId(), request.Comments), ct);
 
         if (result.IsFailure)
-            return BadRequest(new
-            {
-                error = result.Error.Description
-            });
+            return BadRequest(new { error = result.Error.Description });
 
         return Ok(result.Value);
     }
@@ -96,21 +119,13 @@ public sealed class WorkflowController : ControllerBase
         [FromBody] RejectStageRequest request,
         CancellationToken ct)
     {
-        var userId = GetUserId();
-
         var result = await _mediator.Send(
             new RejectStageCommand(
-                id,
-                _tenantContext.TenantId,
-                userId,
-                request.Comments),
-            ct);
+                id, _tenantContext.TenantId,
+                GetUserId(), request.Comments), ct);
 
         if (result.IsFailure)
-            return BadRequest(new
-            {
-                error = result.Error.Description
-            });
+            return BadRequest(new { error = result.Error.Description });
 
         return Ok(result.Value);
     }
@@ -119,9 +134,7 @@ public sealed class WorkflowController : ControllerBase
     {
         var claim = User.FindFirst("sub")?.Value
                  ?? User.FindFirst("user_id")?.Value;
-
-        return Guid.TryParse(claim, out var id)
-            ? id : Guid.Empty;
+        return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
     }
 }
 
