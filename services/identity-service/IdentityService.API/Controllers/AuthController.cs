@@ -2,26 +2,27 @@ using IdentityService.Application.Commands.LoginUser;
 using IdentityService.Application.Commands.RefreshToken;
 using IdentityService.Application.Commands.RegisterTenant;
 using IdentityService.Application.Commands.AddUser;
+using IdentityService.Domain.Repositories;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.API.Controllers;
 
-// AuthController â€” thin controller, delegates everything to MediatR
-// Controllers only:
-// 1. Parse HTTP request
-// 2. Send command/query via MediatR
-// 3. Map Result to HTTP response
-// Zero business logic lives here
 [ApiController]
 [Route("api/identity")]
 public class AuthController : ControllerBase
 {
-    private readonly IMediator _mediator;
+    private readonly IMediator        _mediator;
+    private readonly IUserRepository  _userRepo;
 
-    public AuthController(IMediator mediator)
-        => _mediator = mediator;
+    public AuthController(
+        IMediator       mediator,
+        IUserRepository userRepo)
+    {
+        _mediator = mediator;
+        _userRepo = userRepo;
+    }
 
     /// <summary>Register a new tenant and admin user</summary>
     [HttpPost("register")]
@@ -31,10 +32,8 @@ public class AuthController : ControllerBase
         CancellationToken ct)
     {
         var result = await _mediator.Send(command, ct);
-
         if (result.IsFailure)
             return BadRequest(new { error = result.Error.Description });
-
         return CreatedAtAction(nameof(Register), result.Value);
     }
 
@@ -46,10 +45,8 @@ public class AuthController : ControllerBase
         CancellationToken ct)
     {
         var result = await _mediator.Send(command, ct);
-
         if (result.IsFailure)
             return Unauthorized(new { error = result.Error.Description });
-
         return Ok(result.Value);
     }
 
@@ -61,24 +58,34 @@ public class AuthController : ControllerBase
         CancellationToken ct)
     {
         var result = await _mediator.Send(command, ct);
-
         if (result.IsFailure)
             return Unauthorized(new { error = result.Error.Description });
-
         return Ok(result.Value);
     }
 
-    
     /// <summary>Get all users in tenant — Admin only</summary>
     [HttpGet("users")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetUsers(CancellationToken ct)
     {
         var tenantId = Guid.Parse(
-            User.FindFirst("tenant_id")?.Value ?? Guid.Empty.ToString());
-        var users = await _mediator.Send(
-            new GetUsersQuery(tenantId), ct);
-        return Ok(users);
+            User.FindFirst("tenant_id")?.Value
+                ?? Guid.Empty.ToString());
+
+        // Get all users for this tenant directly from repository
+        var users = await _userRepo
+            .GetByTenantAsync(tenantId, ct);
+
+        var result = users.Select(u => new
+        {
+            userId   = u.Id,
+            email    = u.Email,
+            fullName = u.FullName,
+            role     = u.Role.ToString(),
+            isActive = u.IsActive,
+        });
+
+        return Ok(result);
     }
 
     /// <summary>Add Manager or Viewer user — Admin only</summary>
@@ -88,10 +95,9 @@ public class AuthController : ControllerBase
         [FromBody] AddUserCommand command,
         CancellationToken ct)
     {
-        // Inject TenantId from JWT — Admin cannot add users
-        // to other tenants
         var tenantId = Guid.Parse(
-            User.FindFirst("tenant_id")?.Value ?? Guid.Empty.ToString());
+            User.FindFirst("tenant_id")?.Value
+                ?? Guid.Empty.ToString());
 
         var result = await _mediator.Send(
             command with { TenantId = tenantId }, ct);
@@ -101,16 +107,17 @@ public class AuthController : ControllerBase
 
         return CreatedAtAction(nameof(AddUser), result.Value);
     }
-    /// <summary>Get current user info â€” requires valid JWT</summary>
+
+    /// <summary>Get current user info — requires valid JWT</summary>
     [HttpGet("me")]
     [Authorize]
     public IActionResult Me()
     {
-        var userId = User.FindFirst(
+        var userId   = User.FindFirst(
             System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var email = User.FindFirst(
+        var email    = User.FindFirst(
             System.Security.Claims.ClaimTypes.Email)?.Value;
-        var role = User.FindFirst(
+        var role     = User.FindFirst(
             System.Security.Claims.ClaimTypes.Role)?.Value;
         var tenantId = User.FindFirst("tenant_id")?.Value;
 
