@@ -5,7 +5,6 @@ import {
   OnInit,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
-import { RouterLink } from "@angular/router";
 import {
   FormBuilder,
   FormGroup,
@@ -19,21 +18,20 @@ import { MatSelectModule } from "@angular/material/select";
 import { MatButtonModule } from "@angular/material/button";
 import { MatIconModule } from "@angular/material/icon";
 import { MatTableModule } from "@angular/material/table";
-import { MatChipsModule } from "@angular/material/chips";
 import { MatDividerModule } from "@angular/material/divider";
 import { MatSnackBar, MatSnackBarModule } from "@angular/material/snack-bar";
 import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
+import { MatTooltipModule } from "@angular/material/tooltip";
+import { MatChipsModule } from "@angular/material/chips";
 import { HttpClient } from "@angular/common/http";
 import { environment } from "../../../environments/environment";
-import { AuthService } from "../../core/services/auth.service";
 
 interface TenantUser {
-  userId:    string;
-  email:     string;
-  fullName:  string;
-  role:      string;
-  isActive:  boolean;
-  createdAt: string;
+  userId:   string;
+  email:    string;
+  fullName: string;
+  role:     string;
+  isActive: boolean;
 }
 
 @Component({
@@ -41,7 +39,6 @@ interface TenantUser {
   standalone: true,
   imports: [
     CommonModule,
-    RouterLink,
     ReactiveFormsModule,
     MatCardModule,
     MatFormFieldModule,
@@ -50,33 +47,29 @@ interface TenantUser {
     MatButtonModule,
     MatIconModule,
     MatTableModule,
-    MatChipsModule,
     MatDividerModule,
     MatSnackBarModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
+    MatChipsModule,
   ],
   template: `
     <div class="page-container">
 
       <!-- Header -->
       <div class="page-header">
-        <div>
-          <h1>User Management</h1>
-          <p>Add and manage users in your organization</p>
-        </div>
+        <h1>User Management</h1>
+        <p>Add and manage users in your organization</p>
       </div>
 
       <!-- Add User Form -->
       <mat-card class="form-card">
-        <mat-card-header>
-          <h2>Add New User</h2>
-          <p>Invite a Manager or Viewer to your organization</p>
-        </mat-card-header>
+        <h2>Add New User</h2>
+        <p>Invite a Manager or Viewer to your organization</p>
         <mat-divider></mat-divider>
         <mat-card-content>
           <form [formGroup]="addUserForm"
-            (ngSubmit)="onAddUser()"
-            class="user-form">
+            (ngSubmit)="onAddUser()" class="user-form">
 
             <mat-form-field appearance="outline">
               <mat-label>Full Name</mat-label>
@@ -96,8 +89,7 @@ interface TenantUser {
             <mat-form-field appearance="outline">
               <mat-label>Password</mat-label>
               <input matInput type="password"
-                formControlName="password"
-                placeholder="Min 8 chars"/>
+                formControlName="password"/>
               <mat-icon matSuffix>lock</mat-icon>
             </mat-form-field>
 
@@ -105,10 +97,10 @@ interface TenantUser {
               <mat-label>Role</mat-label>
               <mat-select formControlName="role">
                 <mat-option value="Manager">
-                  Manager — Can upload, approve, reject
+                  Manager ï¿½ Upload, approve, reject
                 </mat-option>
                 <mat-option value="Viewer">
-                  Viewer — Read only access
+                  Viewer ï¿½ Read only
                 </mat-option>
               </mat-select>
               <mat-icon matSuffix>admin_panel_settings</mat-icon>
@@ -125,11 +117,15 @@ interface TenantUser {
               type="submit"
               [disabled]="isAdding() || addUserForm.invalid">
               @if (isAdding()) {
-                <mat-spinner diameter="20"></mat-spinner>
-                Adding...
+                <ng-container>
+                  <mat-spinner diameter="20"></mat-spinner>
+                  Adding...
+                </ng-container>
               } @else {
-                <mat-icon>person_add</mat-icon>
-                Add User
+                <ng-container>
+                  <mat-icon>person_add</mat-icon>
+                  Add User
+                </ng-container>
               }
             </button>
 
@@ -139,9 +135,7 @@ interface TenantUser {
 
       <!-- Users Table -->
       <mat-card class="users-card">
-        <mat-card-header>
-          <h2>Team Members ({{ users().length }})</h2>
-        </mat-card-header>
+        <h2>Team Members ({{ users().length }})</h2>
         <mat-divider></mat-divider>
         <mat-card-content>
 
@@ -153,6 +147,7 @@ interface TenantUser {
 
           @if (!isLoading() && users().length === 0) {
             <div class="empty">
+              <mat-icon>group_off</mat-icon>
               <p>No users yet. Add your first team member above.</p>
             </div>
           }
@@ -161,25 +156,31 @@ interface TenantUser {
             <table mat-table [dataSource]="users()"
               class="users-table">
 
+              <!-- Name Column -->
               <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Name</th>
+                <th mat-header-cell *matHeaderCellDef>Member</th>
                 <td mat-cell *matCellDef="let user">
-                  <div class="user-cell">
-                    <div class="user-avatar">
+                  <div class="user-cell"
+                    [class.blocked]="!user.isActive">
+                    <div class="user-avatar"
+                      [style.background]="!user.isActive
+                        ? '#94A3B8' : '#2563EB'">
                       {{ getInitials(user.fullName) }}
                     </div>
                     <div>
                       <span class="user-name">
                         {{ user.fullName }}
+                        @if (!user.isActive) {
+                          <span class="blocked-label">Blocked</span>
+                        }
                       </span>
-                      <span class="user-email">
-                        {{ user.email }}
-                      </span>
+                      <span class="user-email">{{ user.email }}</span>
                     </div>
                   </div>
                 </td>
               </ng-container>
 
+              <!-- Role Column -->
               <ng-container matColumnDef="role">
                 <th mat-header-cell *matHeaderCellDef>Role</th>
                 <td mat-cell *matCellDef="let user">
@@ -190,21 +191,51 @@ interface TenantUser {
                 </td>
               </ng-container>
 
+              <!-- Status Column -->
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Status</th>
                 <td mat-cell *matCellDef="let user">
                   <span class="status-badge"
                     [class]="user.isActive ? 'active' : 'inactive'">
-                    {{ user.isActive ? "Active" : "Inactive" }}
+                    {{ user.isActive ? "Active" : "Blocked" }}
                   </span>
                 </td>
               </ng-container>
 
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>Actions</th>
+                <td mat-cell *matCellDef="let user">
+                  @if (user.role !== "Admin") {
+                    @if (user.isActive) {
+                      <button mat-stroked-button color="warn"
+                        [disabled]="isBlocking()"
+                        (click)="blockUser(user)"
+                        matTooltip="Block this user">
+                        <mat-icon>block</mat-icon>
+                        Block
+                      </button>
+                    } @else {
+                      <button mat-stroked-button color="primary"
+                        [disabled]="isBlocking()"
+                        (click)="unblockUser(user)"
+                        matTooltip="Restore access">
+                        <mat-icon>check_circle</mat-icon>
+                        Unblock
+                      </button>
+                    }
+                  } @else {
+                    <span class="admin-note">Owner</span>
+                  }
+                </td>
+              </ng-container>
+
               <tr mat-header-row
-                *matHeaderRowDef="displayedColumns">
+                *matHeaderRowDef="cols">
               </tr>
               <tr mat-row
-                *matRowDef="let row; columns: displayedColumns;">
+                *matRowDef="let row; columns: cols;"
+                [class.blocked-row]="!row.isActive">
               </tr>
 
             </table>
@@ -221,119 +252,100 @@ interface TenantUser {
       max-width: 900px;
       margin: 0 auto;
     }
-    .page-header {
-      margin-bottom: 24px;
-    }
+    .page-header { margin-bottom: 24px; }
     .page-header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1E293B;
-      margin: 0 0 4px;
+      font-size: 24px; font-weight: 700;
+      color: #1E293B; margin: 0 0 4px;
     }
-    .page-header p {
-      color: #64748B;
-      margin: 0;
-      font-size: 14px;
-    }
+    .page-header p { color: #64748B; margin: 0; font-size: 14px; }
     .form-card, .users-card {
-      border-radius: 12px;
-      margin-bottom: 20px;
+      border-radius: 12px; margin-bottom: 20px;
     }
     .form-card h2, .users-card h2 {
-      font-size: 16px;
-      font-weight: 600;
-      color: #1E293B;
-      margin: 0 0 4px;
-      padding: 16px;
+      font-size: 16px; font-weight: 600;
+      color: #1E293B; margin: 0; padding: 16px 16px 4px;
     }
     .form-card p {
-      font-size: 13px;
-      color: #64748B;
-      margin: 0;
-      padding: 0 16px 16px;
+      font-size: 13px; color: #64748B;
+      margin: 0; padding: 0 16px 16px;
     }
     .user-form {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      padding: 16px 0;
+      gap: 16px; padding: 16px 0;
     }
-    .user-form mat-form-field {
-      width: 100%;
-    }
+    .user-form mat-form-field { width: 100%; }
     .user-form button {
-      grid-column: 1 / -1;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      width: fit-content;
+      grid-column: 1 / -1; height: 44px;
+      display: flex; align-items: center;
+      gap: 8px; width: fit-content;
     }
     .error-banner {
       grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #FEF2F2;
-      color: #DC2626;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
+      display: flex; align-items: center; gap: 8px;
+      background: #FEF2F2; color: #DC2626;
+      padding: 10px 14px; border-radius: 8px; font-size: 14px;
     }
     .loading, .empty {
-      display: flex;
-      justify-content: center;
-      padding: 32px;
-      color: #64748B;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 32px; gap: 8px; color: #64748B;
+    }
+    .empty mat-icon {
+      font-size: 40px; width: 40px; height: 40px; color: #CBD5E1;
     }
     .users-table { width: 100%; }
     .user-cell {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
+      display: flex; align-items: center;
+      gap: 10px; padding: 8px 0;
     }
+    .user-cell.blocked { opacity: 0.6; }
     .user-avatar {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      border-radius: 50%;
-      background: #2563EB;
-      color: white;
-      display: flex;
-      align-items: center;
+      width: 36px; height: 36px; min-width: 36px;
+      border-radius: 50%; color: white;
+      display: flex; align-items: center;
       justify-content: center;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 12px; font-weight: 700;
     }
     .user-name {
-      display: block;
-      font-size: 14px;
-      font-weight: 500;
-      color: #1E293B;
+      display: block; font-size: 14px;
+      font-weight: 500; color: #1E293B;
     }
     .user-email {
-      display: block;
-      font-size: 12px;
-      color: #94A3B8;
+      display: block; font-size: 12px; color: #94A3B8;
+    }
+    .blocked-label {
+      background: #FEF2F2; color: #DC2626;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 4px;
+      margin-left: 6px; text-transform: uppercase;
     }
     .role-badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
     }
     .role-admin   { background: #FEF3C7; color: #D97706; }
     .role-manager { background: #F0FDF4; color: #16A34A; }
     .role-viewer  { background: #F1F5F9; color: #64748B; }
     .status-badge {
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
     }
     .active   { background: #F0FDF4; color: #16A34A; }
     .inactive { background: #FEF2F2; color: #DC2626; }
+    .blocked-row { background: #FAFAFA; }
+    td button {
+      display: flex; align-items: center;
+      gap: 4px; font-size: 12px;
+    }
+    .admin-note {
+      font-size: 12px; color: #94A3B8;
+      font-style: italic;
+    }
+    th.mat-header-cell {
+      font-size: 12px; font-weight: 600;
+      color: #64748B; text-transform: uppercase;
+    }
     @media (max-width: 600px) {
       .user-form { grid-template-columns: 1fr; }
     }
@@ -343,14 +355,14 @@ export class UserManagementComponent implements OnInit {
   private http     = inject(HttpClient);
   private fb       = inject(FormBuilder);
   private snackBar = inject(MatSnackBar);
-  authService      = inject(AuthService);
 
   users        = signal<TenantUser[]>([]);
-  isLoading    = signal(true);
+  isLoading    = signal(false);
   isAdding     = signal(false);
+  isBlocking   = signal(false);
   errorMessage = signal("");
 
-  displayedColumns = ["name", "role", "status"];
+  cols = ["name", "role", "status", "actions"];
 
   addUserForm: FormGroup;
 
@@ -368,10 +380,11 @@ export class UserManagementComponent implements OnInit {
   }
 
   private loadUsers(): void {
+    this.isLoading.set(true);
     this.http.get<TenantUser[]>(
       `${environment.identityUrl}/api/identity/users`)
       .subscribe({
-        next:  (users) => {
+        next: (users) => {
           this.users.set(Array.isArray(users) ? users : []);
           this.isLoading.set(false);
         },
@@ -384,7 +397,6 @@ export class UserManagementComponent implements OnInit {
 
   onAddUser(): void {
     if (this.addUserForm.invalid) return;
-
     this.isAdding.set(true);
     this.errorMessage.set("");
 
@@ -394,12 +406,11 @@ export class UserManagementComponent implements OnInit {
       .subscribe({
         next: (newUser) => {
           this.users.update(u => [...u, {
-            userId:    newUser.userId,
-            email:     this.addUserForm.value.email,
-            fullName:  this.addUserForm.value.fullName,
-            role:      newUser.role,
-            isActive:  true,
-            createdAt: new Date().toISOString(),
+            userId:   newUser.userId,
+            email:    this.addUserForm.value.email,
+            fullName: this.addUserForm.value.fullName,
+            role:     newUser.role,
+            isActive: true,
           }]);
           this.addUserForm.reset({ role: "Viewer" });
           this.isAdding.set(false);
@@ -415,8 +426,59 @@ export class UserManagementComponent implements OnInit {
       });
   }
 
+  blockUser(user: TenantUser): void {
+    this.isBlocking.set(true);
+    this.http.put(
+      `${environment.identityUrl}/api/identity/users/${user.userId}/block`,
+      {})
+      .subscribe({
+        next: () => {
+          this.users.update(users =>
+            users.map(u =>
+              u.userId === user.userId
+                ? { ...u, isActive: false } : u));
+          this.isBlocking.set(false);
+          this.snackBar.open(
+            `${user.fullName} has been blocked`,
+            "Close", { duration: 3000 });
+        },
+        error: (err) => {
+          this.isBlocking.set(false);
+          this.snackBar.open(
+            err.error?.error ?? "Failed to block user",
+            "Close", { duration: 3000 });
+        },
+      });
+  }
+
+  unblockUser(user: TenantUser): void {
+    this.isBlocking.set(true);
+    this.http.put(
+      `${environment.identityUrl}/api/identity/users/${user.userId}/unblock`,
+      {})
+      .subscribe({
+        next: () => {
+          this.users.update(users =>
+            users.map(u =>
+              u.userId === user.userId
+                ? { ...u, isActive: true } : u));
+          this.isBlocking.set(false);
+          this.snackBar.open(
+            `${user.fullName} has been unblocked`,
+            "Close", { duration: 3000 });
+        },
+        error: (err) => {
+          this.isBlocking.set(false);
+          this.snackBar.open(
+            err.error?.error ?? "Failed to unblock user",
+            "Close", { duration: 3000 });
+        },
+      });
+  }
+
   getInitials(name: string): string {
-    return name.split(" ").map(n => n[0])
-      .join("").toUpperCase().slice(0, 2);
+    return (name ?? "").split(" ")
+      .map(n => n[0]).join("")
+      .toUpperCase().slice(0, 2);
   }
 }
