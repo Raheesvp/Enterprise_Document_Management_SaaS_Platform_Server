@@ -119,13 +119,6 @@ public sealed class UploadDocumentCommandHandler
             }
         }
 
-                await _publishEndpoint.Publish(new DocumentUploadEvent
-        {
-            DocumentId = document.Id,
-            TenantId = document.TenantId,
-            Title = document.Title.Value,
-            UploadedByUserId = document.UploadedByUserId
-        }, cancellationToken); // Added missing semicolon here
 
         return Result.Success(ToDto(document));
             }
