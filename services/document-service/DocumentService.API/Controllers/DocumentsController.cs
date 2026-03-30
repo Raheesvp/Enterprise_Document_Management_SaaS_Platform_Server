@@ -3,6 +3,7 @@ using DocumentService.Application.Interfaces;
 using DocumentService.Application.Queries.GetDocument;
 using DocumentService.Application.Queries.GetDocumentList;
 using DocumentService.Application.Queries.GetDocumentVersions;
+using DocumentService.Application.Queries.SearchDocuments;
 using DocumentService.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -16,27 +17,27 @@ namespace DocumentService.API.Controllers;
 [Authorize]
 public sealed class DocumentsController : ControllerBase
 {
-    private readonly IMediator _mediator;
-    private readonly ITenantContext _tenantContext;
+    private readonly IMediator       _mediator;
+    private readonly ITenantContext  _tenantContext;
     private readonly IStorageService _storageService;
 
     public DocumentsController(
-        IMediator mediator,
-        ITenantContext tenantContext,
+        IMediator       mediator,
+        ITenantContext  tenantContext,
         IStorageService storageService)
     {
-        _mediator      = mediator;
-        _tenantContext = tenantContext;
+        _mediator       = mediator;
+        _tenantContext  = tenantContext;
         _storageService = storageService;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetDocuments(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? status = null,
+        [FromQuery] int     page       = 1,
+        [FromQuery] int     pageSize   = 10,
+        [FromQuery] string? status     = null,
         [FromQuery] string? searchTerm = null,
-        CancellationToken ct = default)
+        CancellationToken   ct         = default)
     {
         DocumentStatus? documentStatus = null;
         if (!string.IsNullOrEmpty(status) &&
@@ -60,9 +61,26 @@ public sealed class DocumentsController : ControllerBase
         return Ok(result.Value);
     }
 
+    // IMPORTANT: [HttpGet("search")] must be ABOVE [HttpGet("{id:guid}")]
+    // to avoid route conflicts
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string q,
+        CancellationToken  ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest("Query parameter 'q' is required.");
+
+        var tenantId = GetTenantId();
+        var results  = await _mediator.Send(
+            new SearchDocumentsQuery(tenantId, q), ct);
+
+        return Ok(results);
+    }
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetDocument(
-        Guid id,
+        Guid              id,
         CancellationToken ct)
     {
         var query = new GetDocumentQuery(
@@ -79,7 +97,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpGet("{id:guid}/versions")]
     public async Task<IActionResult> GetVersions(
-        Guid id,
+        Guid              id,
         CancellationToken ct)
     {
         var query = new GetDocumentVersionsQuery(
@@ -96,7 +114,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpPost("{id:guid}/archive")]
     public async Task<IActionResult> Archive(
-        Guid id,
+        Guid              id,
         CancellationToken ct)
     {
         var command = new ArchiveDocumentCommand(
@@ -114,7 +132,7 @@ public sealed class DocumentsController : ControllerBase
 
     [HttpGet("{id:guid}/download")]
     public async Task<IActionResult> Download(
-        Guid id,
+        Guid              id,
         CancellationToken ct)
     {
         var query = new GetDocumentQuery(
@@ -147,22 +165,20 @@ public sealed class DocumentsController : ControllerBase
         }
     }
 
-    private static string BuildDownloadFileName(
-        string title,
-        string mimeType)
+    private static string BuildDownloadFileName(string title, string mimeType)
     {
         if (Path.HasExtension(title))
             return title;
 
         var extension = mimeType.ToLowerInvariant() switch
         {
-            "application/pdf" => ".pdf",
-            "text/plain" => ".txt",
-            "image/png" => ".png",
-            "image/jpeg" => ".jpg",
+            "application/pdf"     => ".pdf",
+            "text/plain"          => ".txt",
+            "image/png"           => ".png",
+            "image/jpeg"          => ".jpg",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
-            _ => string.Empty
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"       => ".xlsx",
+            _                     => string.Empty
         };
 
         return $"{title}{extension}";
@@ -172,7 +188,14 @@ public sealed class DocumentsController : ControllerBase
     {
         var claim = User.FindFirst("sub")?.Value
                  ?? User.FindFirst("user_id")?.Value;
-        return Guid.TryParse(claim, out var id)
-            ? id : Guid.Empty;
+        return Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+    }
+
+    private Guid GetTenantId()
+    {
+        var tenantClaim = User.FindFirst("tenant_id")?.Value;
+        if (string.IsNullOrEmpty(tenantClaim))
+            throw new UnauthorizedAccessException("Tenant ID is missing from token.");
+        return Guid.Parse(tenantClaim);
     }
 }

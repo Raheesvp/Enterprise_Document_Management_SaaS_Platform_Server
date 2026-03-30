@@ -45,16 +45,18 @@ public sealed class DocumentVersionAddedEventHandler
             return;
         }
 
-        var integrationEvent = new DocumentUploadEvent
+        var integrationEvent = new DocumentUploadEvent(
+            DocumentId:       domainEvent.DocumentId,
+            TenantId:         domainEvent.TenantId,
+            Title:            document.Title.Value,
+            UploadedByUserId: domainEvent.UploadedByUserId,
+            FileName:         document.Title.Value,
+            ContentType:      document.ContentType.MimeType,
+            FileSizeBytes:    document.CurrentVersion?.FileSize.Bytes ?? 0,
+            StoragePath:      domainEvent.StoragePath)
         {
-            EventId          = domainEvent.EventId,
-            OccuredOn        = domainEvent.OccuredOn,
-            TenantId         = domainEvent.TenantId,
-            DocumentId       = domainEvent.DocumentId,
-            UploadedByUserId = domainEvent.UploadedByUserId,
-            FileName         = document.Title.Value,
-            ContentType      = document.ContentType.MimeType,
-            StoragePath      = domainEvent.StoragePath
+            EventId   = domainEvent.EventId,
+            OccuredOn = domainEvent.OccuredOn
         };
 
         // Reuse the same publisher to send DocumentUploadEvent

@@ -1,18 +1,22 @@
-﻿using DocumentService.Application.Interfaces;
+using DocumentService.Application.Interfaces;
 using DocumentService.Domain.Repositories;
 using DocumentService.Infrastructure.Messaging;
 using DocumentService.Infrastructure.Messaging.Consumers;
 using DocumentService.Infrastructure.Persistence;
 using DocumentService.Infrastructure.Persistence.Interceptors;
 using DocumentService.Infrastructure.Repositories;
+using DocumentService.Infrastructure.Search;
 using DocumentService.Infrastructure.Services;
 using DocumentService.Infrastructure.Storage;
 using DocumentService.Infrastructure.Upload;
+using DocumentService.Infrastructure.Caching;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Minio;
+using Nest;
+using StackExchange.Redis;
 using Shared.Domain.Common;
 
 namespace DocumentService.Infrastructure;
@@ -85,6 +89,9 @@ public static class DependencyInjection
                 .Build();
         });
 
+
+        
+
         // Real storage — replaced stub Day 18
         services.AddScoped<IStorageService, MinioStorageService>();
 
@@ -95,6 +102,13 @@ public static class DependencyInjection
                 configuration.GetConnectionString("Redis")
                 ?? "localhost:6379,password=SaaS@Redis2024!";
         });
+
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+            ConnectionMultiplexer.Connect(
+                configuration.GetConnectionString("Redis")
+                ?? "localhost:6379,password=SaaS@Redis2024!"));
+
+        services.AddScoped<ICacheService, RedisCacheService>();
 
         // Upload session store
         services.AddScoped<IUploadSessionStore,
@@ -137,6 +151,14 @@ public static class DependencyInjection
             });
         });
 
+        //Elastic search functionality
+
+       var esUri = new Uri(configuration["Elasticsearch:Url"] ?? "http://localhost:9200");
+var esSettings = new ConnectionSettings(esUri)
+    .DefaultIndex("documents");
+var esClient = new ElasticClient(esSettings);
+services.AddSingleton<IElasticClient>(esClient);
+services.AddScoped<ISearchService, ElasticsearchService>();
         // Event publisher
         services.AddScoped<IDocumentEventPublisher,
             DocumentEventPublisher>();

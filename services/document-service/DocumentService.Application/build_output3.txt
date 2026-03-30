@@ -1,0 +1,17 @@
+  Determining projects to restore...
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+  All projects are up-to-date for restore.
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+  Shared.Contracts -> C:\Projects\ProjectSaas\shared\Shared.Contracts\bin\Debug\net8.0\Shared.Contracts.dll
+  Shared.Domain -> C:\Projects\ProjectSaas\shared\Shared.Domain\bin\Debug\net8.0\Shared.Domain.dll
+  DocumentService.Domain -> C:\Projects\ProjectSaas\services\document-service\DocumentService.Domain\bin\Debug\net8.0\DocumentService.Domain.dll
+  DocumentService.Application -> C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\bin\Debug\net8.0\DocumentService.Application.dll
+
+Build succeeded.
+
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+    2 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:04.26

@@ -2,6 +2,7 @@ using DocumentService.Application.DTOs;
 using DocumentService.Application.Interfaces;
 using DocumentService.Domain.Entities;
 using DocumentService.Domain.Repositories;
+using DocumentService.Domain.Search;
 using DocumentService.Domain.ValueObjects;
 using MassTransit;
 using MediatR;
@@ -15,23 +16,28 @@ public sealed class UploadDocumentCommandHandler
 {
     private readonly IDocumentRepository _documentRepo;
     private readonly IStorageService     _storageService;
+    private readonly IPublishEndpoint    _publishEndpoint;
+    private readonly ISearchService      _searchService;
 
-    private readonly IPublishEndpoint _publishEndpoint;
+   
 
     public UploadDocumentCommandHandler(
         IDocumentRepository documentRepo,
         IStorageService     storageService,
-        IPublishEndpoint    publishEndpoint )
+        IPublishEndpoint    publishEndpoint,
+        ISearchService      searchService)
     {
-        _documentRepo   = documentRepo;
-        _storageService = storageService;
+        _documentRepo    = documentRepo;
+        _storageService  = storageService;
         _publishEndpoint = publishEndpoint;
+        _searchService   = searchService;
     }
 
     public async Task<Result<DocumentDto>> Handle(
         UploadDocumentCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken     cancellationToken)
     {
+        // --- Value object validation ---
         DocumentTitle title;
         FileSize      fileSize;
         ContentType   contentType;
@@ -42,8 +48,7 @@ public sealed class UploadDocumentCommandHandler
             fileSize    = FileSize.FromBytes(command.FileSizeBytes);
             contentType = ContentType.Create(command.MimeType);
 
-            if (contentType.DocumentType ==
-                Domain.Enums.DocumentType.Other)
+            if (contentType.DocumentType == Domain.Enums.DocumentType.Other)
             {
                 return Result.Failure<DocumentDto>(
                     new Error("Document.UnsupportedType",
@@ -56,10 +61,10 @@ public sealed class UploadDocumentCommandHandler
                 new Error("Document.ValidationFailed", ex.Message));
         }
 
+        // --- Storage ---
         var documentId  = Guid.NewGuid();
         var fileName    = SanitizeFileName(command.Title);
-        var storagePath = StoragePath.Create(
-            command.TenantId, documentId, fileName);
+        var storagePath = StoragePath.Create(command.TenantId, documentId, fileName);
 
         await _storageService.UploadAsync(
             storagePath.Value,
@@ -67,16 +72,19 @@ public sealed class UploadDocumentCommandHandler
             command.MimeType,
             cancellationToken);
 
+        // --- Persist document (new, manual version, or auto version) ---
         Document document;
+
         if (command.DocumentId.HasValue)
         {
+            // Explicit version: caller specified a DocumentId to version against
             var existing = await _documentRepo.GetByIdAsync(
                 command.DocumentId.Value, command.TenantId, cancellationToken);
-            
+
             if (existing is null || existing.TenantId != command.TenantId)
             {
                 return Result.Failure<DocumentDto>(
-                    new Error("Document.NotFound", 
+                    new Error("Document.NotFound",
                         $"Document with ID {command.DocumentId} not found."));
             }
 
@@ -86,9 +94,10 @@ public sealed class UploadDocumentCommandHandler
         }
         else
         {
-            // Automatic versioning: check if a document with the same title already exists
-            var existing = await _documentRepo.GetByTitleAsync(command.Title, command.TenantId, cancellationToken);
-            
+            // Automatic versioning: same title in same tenant → new version
+            var existing = await _documentRepo.GetByTitleAsync(
+                command.Title, command.TenantId, cancellationToken);
+
             if (existing != null)
             {
                 existing.AddVersion(storagePath, fileSize, command.UploadedByUserId);
@@ -97,6 +106,7 @@ public sealed class UploadDocumentCommandHandler
             }
             else
             {
+                // Brand new document
                 document = Document.Create(
                     command.TenantId,
                     command.UploadedByUserId,
@@ -119,15 +129,42 @@ public sealed class UploadDocumentCommandHandler
             }
         }
 
+        // --- Elasticsearch: upsert (works for both new docs and new versions) ---
+        var docIndex = new DocumentIndex
+        {
+            Id             = document.Id,
+            TenantId       = document.TenantId,
+            Title          = document.Title.Value,
+            ContentType    = document.ContentType.MimeType,
+            Status         = document.Status.ToString(),
+            UploadedByName = document.UploadedByName,
+            FileSizeBytes  = document.CurrentVersion?.FileSize.Bytes ?? fileSize.Bytes,
+            CreatedAt      = document.CreatedAt
+        };
+        await _searchService.IndexDocumentAsync(docIndex, cancellationToken);
+
+        // --- RabbitMQ: triggers WorkflowService → NotificationService → SignalR ---
+        await _publishEndpoint.Publish(
+            new DocumentUploadEvent(
+                DocumentId:       document.Id,
+                TenantId:         document.TenantId,
+                Title:            document.Title.Value,
+                UploadedByUserId: document.UploadedByUserId,
+                FileName:         fileName,
+                ContentType:      document.ContentType.MimeType,
+                FileSizeBytes:    fileSize.Bytes,
+                StoragePath:      storagePath.Value),
+            cancellationToken);
 
         return Result.Success(ToDto(document));
-            }
- 
+    }
+
+    // --- Helpers ---
+
     private static string SanitizeFileName(string title)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        return string.Concat(
-            title.Select(c => invalid.Contains(c) ? '_' : c));
+        return string.Concat(title.Select(c => invalid.Contains(c) ? '_' : c));
     }
 
     private static DocumentDto ToDto(Document doc)

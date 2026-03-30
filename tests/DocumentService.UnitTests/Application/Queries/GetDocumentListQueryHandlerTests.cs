@@ -12,9 +12,11 @@ public class GetDocumentListQueryHandlerTests
 {
     private readonly Mock<IDocumentReadRepository> _readRepo = new();
     private readonly Mock<IStorageService> _storageService = new();
+    private readonly Mock<ICacheService> _cache = new();
+    private readonly Mock<Microsoft.Extensions.Logging.ILogger<GetDocumentListQueryHandler>> _logger = new();
 
     private GetDocumentListQueryHandler CreateHandler()
-        => new(_readRepo.Object, _storageService.Object);
+        => new(_readRepo.Object, _storageService.Object, _cache.Object, _logger.Object);
 
     [Fact]
     public async Task Handle_ReturnsPagedDocuments_WithDownloadUrls()

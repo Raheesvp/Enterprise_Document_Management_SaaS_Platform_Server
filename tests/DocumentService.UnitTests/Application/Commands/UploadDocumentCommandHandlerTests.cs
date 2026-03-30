@@ -16,9 +16,11 @@ public class UploadDocumentCommandHandlerTests
     // 1. Added missing semicolon and fixed the mock declaration
     private readonly Mock<IPublishEndpoint> _publishEndpointMock = new();
 
+    private readonly Mock<ISearchService> _searchServiceMock = new();
+
     // 2. Updated to include the third parameter required by the constructor
     private UploadDocumentCommandHandler CreateHandler()
-        => new(_repo.Object, _storage.Object, _publishEndpointMock.Object);
+        => new(_repo.Object, _storage.Object, _publishEndpointMock.Object,_searchServiceMock.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_ReturnsSuccessWithDocumentDto()

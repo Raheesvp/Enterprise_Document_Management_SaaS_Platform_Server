@@ -2,6 +2,7 @@ using DocumentService.Domain.Errors;
 using DocumentService.Domain.Repositories;
 using MediatR;
 using Shared.Domain.Common;
+using DocumentService.Application.Interfaces;
 
 namespace DocumentService.Application.Commands.ArchiveDocument;
 

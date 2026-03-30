@@ -1,27 +1,17 @@
-
 namespace Shared.Contracts.IntegrationEvents.Documents;
 
-public record DocumentUploadEvent
+public record DocumentUploadEvent(
+    Guid DocumentId,
+    Guid TenantId,
+    string Title,
+    Guid UploadedByUserId,
+    string FileName,
+    string ContentType,
+    long FileSizeBytes,
+    string StoragePath,
+    Guid? WorkflowTemplateId = null)
 {
-    public Guid EventId {get;init;} =Guid.NewGuid();
-    public DateTime OccuredOn{get;init;} =DateTime.UtcNow;
-
-    public Guid TenantId {get;init;}
-
-    public string Title {get;init;} = string.Empty;
-
-    public Guid DocumentId {get;init;}
-
-    public Guid UploadedByUserId {get;init;}
-
-    public string FileName {get;init;} =string.Empty;
-    
-    public string ContentType {get;init;} =string.Empty;
-
-    public long FileSizeBytes {get;init;}
-
-    public string StoragePath {get;init;} =string.Empty;
-
-    public Guid? WorkflowTemplateId {get;init;}
-    
+    // These remain inside because they have default values
+    public Guid EventId { get; init; } = Guid.NewGuid();
+    public DateTime OccuredOn { get; init; } = DateTime.UtcNow;
 }

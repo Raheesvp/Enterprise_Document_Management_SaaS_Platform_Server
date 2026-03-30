@@ -1,0 +1,41 @@
+  Determining projects to restore...
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x [C:\Projects\ProjectSaas\ProjectSaas.sln]
+C:\Projects\ProjectSaas\services\identity-service\IdentityService.Application\IdentityService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x [C:\Projects\ProjectSaas\ProjectSaas.sln]
+  All projects are up-to-date for restore.
+C:\Projects\ProjectSaas\services\identity-service\IdentityService.Application\IdentityService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+  Shared.Domain -> C:\Projects\ProjectSaas\shared\Shared.Domain\bin\Debug\net8.0\Shared.Domain.dll
+  Shared.Infrastructure -> C:\Projects\ProjectSaas\shared\Shared.Infrastructure\bin\Debug\net8.0\Shared.Infrastructure.dll
+  Shared.Contracts -> C:\Projects\ProjectSaas\shared\Shared.Contracts\bin\Debug\net8.0\Shared.Contracts.dll
+  IdentityService.Domain -> C:\Projects\ProjectSaas\services\identity-service\IdentityService.Domain\bin\Debug\net8.0\IdentityService.Domain.dll
+  NotificationService.Domain -> C:\Projects\ProjectSaas\services\notification-service\NotificationService.Domain\bin\Debug\net8.0\NotificationService.Domain.dll
+  DocumentService.Domain -> C:\Projects\ProjectSaas\services\document-service\DocumentService.Domain\bin\Debug\net8.0\DocumentService.Domain.dll
+  IdentityService.UnitTests -> C:\Projects\ProjectSaas\tests\unit\IdentityService.UnitTests\bin\Debug\net8.0\IdentityService.UnitTests.dll
+  NotificationService.Application -> C:\Projects\ProjectSaas\services\notification-service\NotificationService.Application\bin\Debug\net8.0\NotificationService.Application.dll
+  WorkflowService.Domain -> C:\Projects\ProjectSaas\services\workflow-service\WorkflowService.Domain\bin\Debug\net8.0\WorkflowService.Domain.dll
+  Gateway.API -> C:\Projects\ProjectSaas\gateway\Gateway.API\bin\Debug\net8.0\Gateway.API.dll
+  IdentityService.Application -> C:\Projects\ProjectSaas\services\identity-service\IdentityService.Application\bin\Debug\net8.0\IdentityService.Application.dll
+  NotificationService.Infrastructure -> C:\Projects\ProjectSaas\services\notification-service\NotificationService.Infrastructure\bin\Debug\net8.0\NotificationService.Infrastructure.dll
+  WorkflowService.Application -> C:\Projects\ProjectSaas\services\workflow-service\WorkflowService.Application\bin\Debug\net8.0\WorkflowService.Application.dll
+  DocumentService.UnitTests -> C:\Projects\ProjectSaas\tests\unit\DocumentService.UnitTests\bin\Debug\net8.0\DocumentService.UnitTests.dll
+  IdentityService.Infrastructure -> C:\Projects\ProjectSaas\services\identity-service\IdentityService.Infrastructure\bin\Debug\net8.0\IdentityService.Infrastructure.dll
+  NotificationService.API -> C:\Projects\ProjectSaas\services\notification-service\NotificationService.API\bin\Debug\net8.0\NotificationService.API.dll
+  WorkflowService.Infrastructure -> C:\Projects\ProjectSaas\services\workflow-service\WorkflowService.Infrastructure\bin\Debug\net8.0\WorkflowService.Infrastructure.dll
+  DocumentService.Application -> C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\bin\Debug\net8.0\DocumentService.Application.dll
+  IdentityService.API -> C:\Projects\ProjectSaas\services\identity-service\IdentityService.API\bin\Debug\net8.0\IdentityService.API.dll
+  WorkflowService.API -> C:\Projects\ProjectSaas\services\workflow-service\WorkflowService.API\bin\Debug\net8.0\WorkflowService.API.dll
+  DocumentService.UnitTests -> C:\Projects\ProjectSaas\tests\DocumentService.UnitTests\bin\Debug\net9.0\DocumentService.UnitTests.dll
+  DocumentService.Infrastructure -> C:\Projects\ProjectSaas\services\document-service\DocumentService.Infrastructure\bin\Debug\net8.0\DocumentService.Infrastructure.dll
+  DocumentService.API -> C:\Projects\ProjectSaas\services\document-service\DocumentService.API\bin\Debug\net8.0\DocumentService.API.dll
+  Integration.Tests -> C:\Projects\ProjectSaas\tests\integration\Integration.Tests\bin\Debug\net8.0\Integration.Tests.dll
+
+Build succeeded.
+
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x [C:\Projects\ProjectSaas\ProjectSaas.sln]
+C:\Projects\ProjectSaas\services\identity-service\IdentityService.Application\IdentityService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x [C:\Projects\ProjectSaas\ProjectSaas.sln]
+C:\Projects\ProjectSaas\services\identity-service\IdentityService.Application\IdentityService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+C:\Projects\ProjectSaas\services\document-service\DocumentService.Application\DocumentService.Application.csproj : warning NU1903: Package 'AutoMapper' 13.0.1 has a known high severity vulnerability, https://github.com/advisories/GHSA-rvv3-g6hj-g44x
+    4 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:15.96

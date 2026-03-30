@@ -52,7 +52,11 @@ public sealed class ValidationBehavior<TRequest, TResponse>
             failures[0].ErrorMessage);
 
         return (TResponse)typeof(Result)
-            .GetMethod(nameof(Result.Failure))!
+    .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+    .First(m => m.Name == nameof(Result.Failure)
+             && m.IsGenericMethod
+             && m.GetParameters().Length == 1
+             && m.GetParameters()[0].ParameterType == typeof(Error))
             .MakeGenericMethod(
                 typeof(TResponse).GenericTypeArguments
                 .FirstOrDefault() ?? typeof(object))
