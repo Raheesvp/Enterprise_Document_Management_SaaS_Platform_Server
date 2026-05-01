@@ -43,7 +43,8 @@ public sealed class ValidationBehavior<TRequest, TResponse>
 
         // Use reflection to create Result<T>.Failure — type safe
         return (TResponse)typeof(Result)
-            .GetMethod(nameof(Result.Failure))!
+            .GetMethods()
+            .First(m => m.Name == nameof(Result.Failure) && m.IsGenericMethod)
             .MakeGenericMethod(typeof(TResponse).GenericTypeArguments[0])
             .Invoke(null, new object[] { error })!;
     }

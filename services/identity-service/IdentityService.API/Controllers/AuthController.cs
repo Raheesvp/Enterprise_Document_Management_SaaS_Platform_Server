@@ -47,7 +47,7 @@ public class AuthController : ControllerBase
     {
         var result = await _mediator.Send(command, ct);
         if (result.IsFailure)
-            return Unauthorized(new { error = result.Error.Description });
+            if (result.Error.Code.StartsWith("Validation.")) return BadRequest(new { error = result.Error.Description }); return Unauthorized(new { error = result.Error.Description });
         return Ok(result.Value);
     }
 
@@ -60,11 +60,15 @@ public class AuthController : ControllerBase
     {
         var result = await _mediator.Send(command, ct);
         if (result.IsFailure)
+        {
+            if (result.Error.Code.StartsWith("Validation."))
+                return BadRequest(new { error = result.Error.Description });
             return Unauthorized(new { error = result.Error.Description });
+        }
         return Ok(result.Value);
     }
 
-    /// <summary>Get all users in tenant — Admin only</summary>
+    /// <summary>Get all users in tenant â€” Admin only</summary>
     [HttpGet("users")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetUsers(CancellationToken ct)
@@ -84,7 +88,7 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Add Manager or Viewer user — Admin only</summary>
+    /// <summary>Add Manager or Viewer user â€” Admin only</summary>
     [HttpPost("users")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AddUser(
@@ -100,7 +104,7 @@ public class AuthController : ControllerBase
         return CreatedAtAction(nameof(AddUser), result.Value);
     }
 
-    /// <summary>Block a user — Admin only</summary>
+    /// <summary>Block a user â€” Admin only</summary>
     [HttpPut("users/{userId}/block")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> BlockUser(
@@ -117,7 +121,7 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Unblock a user — Admin only</summary>
+    /// <summary>Unblock a user â€” Admin only</summary>
     [HttpPut("users/{userId}/unblock")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UnblockUser(
@@ -134,7 +138,7 @@ public class AuthController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Get current user info — requires valid JWT</summary>
+    /// <summary>Get current user info â€” requires valid JWT</summary>
     [HttpGet("me")]
     [Authorize]
     public IActionResult Me()
@@ -154,3 +158,4 @@ public class AuthController : ControllerBase
         Guid.Parse(User.FindFirst("tenant_id")?.Value
             ?? Guid.Empty.ToString());
 }
+

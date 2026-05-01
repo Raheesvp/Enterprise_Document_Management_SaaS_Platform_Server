@@ -1,3 +1,4 @@
+using DocumentService.Application.Common;
 using DocumentService.Application.DTOs;
 using DocumentService.Application.Interfaces;
 using DocumentService.Domain.Entities;
@@ -8,6 +9,10 @@ using MassTransit;
 using MediatR;
 using Shared.Contracts.IntegrationEvents.Documents;
 using Shared.Domain.Common;
+using System.Diagnostics;
+using Shared.Infrastructure.Telemetry;
+
+
 
 namespace DocumentService.Application.Commands.UploadDocument;
 
@@ -18,19 +23,20 @@ public sealed class UploadDocumentCommandHandler
     private readonly IStorageService     _storageService;
     private readonly IPublishEndpoint    _publishEndpoint;
     private readonly ISearchService      _searchService;
-
-   
+    private readonly ICacheService       _cache;
 
     public UploadDocumentCommandHandler(
         IDocumentRepository documentRepo,
         IStorageService     storageService,
         IPublishEndpoint    publishEndpoint,
-        ISearchService      searchService)
+        ISearchService      searchService,
+        ICacheService       cache)
     {
         _documentRepo    = documentRepo;
         _storageService  = storageService;
         _publishEndpoint = publishEndpoint;
         _searchService   = searchService;
+        _cache           = cache;
     }
 
     public async Task<Result<DocumentDto>> Handle(
@@ -66,18 +72,25 @@ public sealed class UploadDocumentCommandHandler
         var fileName    = SanitizeFileName(command.Title);
         var storagePath = StoragePath.Create(command.TenantId, documentId, fileName);
 
+        using var storageSpan = ActivitySources.Documents
+            .StartActivity("storage.upload");
+        storageSpan?.SetTag("document.title",  command.Title);
+        storageSpan?.SetTag("tenant.id",       command.TenantId.ToString());
+        storageSpan?.SetTag("file.size.bytes", command.FileSizeBytes);
+
         await _storageService.UploadAsync(
             storagePath.Value,
             command.FileContent,
             command.MimeType,
             cancellationToken);
 
-        // --- Persist document (new, manual version, or auto version) ---
+        storageSpan?.SetStatus(ActivityStatusCode.Ok);
+
+        // --- Persist document ---
         Document document;
 
         if (command.DocumentId.HasValue)
         {
-            // Explicit version: caller specified a DocumentId to version against
             var existing = await _documentRepo.GetByIdAsync(
                 command.DocumentId.Value, command.TenantId, cancellationToken);
 
@@ -90,11 +103,15 @@ public sealed class UploadDocumentCommandHandler
 
             existing.AddVersion(storagePath, fileSize, command.UploadedByUserId);
             document = existing;
+            
+            using var dbSpan = ActivitySources.Documents
+                .StartActivity("db.update_document");
             await _documentRepo.UpdateAsync(document, cancellationToken);
+            dbSpan?.SetTag("document.id", document.Id.ToString());
+            dbSpan?.SetStatus(ActivityStatusCode.Ok);
         }
         else
         {
-            // Automatic versioning: same title in same tenant → new version
             var existing = await _documentRepo.GetByTitleAsync(
                 command.Title, command.TenantId, cancellationToken);
 
@@ -102,11 +119,15 @@ public sealed class UploadDocumentCommandHandler
             {
                 existing.AddVersion(storagePath, fileSize, command.UploadedByUserId);
                 document = existing;
+                
+                using var dbSpan = ActivitySources.Documents
+                    .StartActivity("db.update_document");
                 await _documentRepo.UpdateAsync(document, cancellationToken);
+                dbSpan?.SetTag("document.id", document.Id.ToString());
+                dbSpan?.SetStatus(ActivityStatusCode.Ok);
             }
             else
             {
-                // Brand new document
                 document = Document.Create(
                     command.TenantId,
                     command.UploadedByUserId,
@@ -125,11 +146,25 @@ public sealed class UploadDocumentCommandHandler
                 document.MarkAsProcessing();
                 document.MarkAsActive();
 
+                using var dbSpan = ActivitySources.Documents
+                    .StartActivity("db.add_document");
                 await _documentRepo.AddAsync(document, cancellationToken);
+                dbSpan?.SetTag("document.id", document.Id.ToString());
+                dbSpan?.SetStatus(ActivityStatusCode.Ok);
             }
         }
 
-        // --- Elasticsearch: upsert (works for both new docs and new versions) ---
+        // --- Cache invalidation span ---
+        using var cacheSpan = ActivitySources.Documents
+            .StartActivity("cache.invalidate");
+
+        await _cache.RemoveByPrefixAsync(
+            CacheKeys.DocumentListPrefix(command.TenantId),
+            cancellationToken);
+
+        cacheSpan?.SetStatus(ActivityStatusCode.Ok);
+
+        // --- Elasticsearch: upsert ---
         var docIndex = new DocumentIndex
         {
             Id             = document.Id,
@@ -141,9 +176,21 @@ public sealed class UploadDocumentCommandHandler
             FileSizeBytes  = document.CurrentVersion?.FileSize.Bytes ?? fileSize.Bytes,
             CreatedAt      = document.CreatedAt
         };
+
+        using var esSpan = ActivitySources.Documents
+            .StartActivity("elasticsearch.index");
+
         await _searchService.IndexDocumentAsync(docIndex, cancellationToken);
 
-        // --- RabbitMQ: triggers WorkflowService → NotificationService → SignalR ---
+        esSpan?.SetTag("es.index",       "documents");
+        esSpan?.SetTag("document.id",    document.Id.ToString());
+        esSpan?.SetStatus(ActivityStatusCode.Ok);
+
+        // --- RabbitMQ: publish event ---
+        using var mqSpan = ActivitySources.Documents
+            .StartActivity("rabbitmq.publish");
+        mqSpan?.SetTag("event.type", "DocumentUploadEvent");
+
         await _publishEndpoint.Publish(
             new DocumentUploadEvent(
                 DocumentId:       document.Id,
@@ -155,6 +202,8 @@ public sealed class UploadDocumentCommandHandler
                 FileSizeBytes:    fileSize.Bytes,
                 StoragePath:      storagePath.Value),
             cancellationToken);
+
+        mqSpan?.SetStatus(ActivityStatusCode.Ok);
 
         return Result.Success(ToDto(document));
     }

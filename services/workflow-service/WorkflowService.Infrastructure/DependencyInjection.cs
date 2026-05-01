@@ -10,6 +10,7 @@ using WorkflowService.Infrastructure.Consumers;
 using WorkflowService.Infrastructure.Jobs;
 using WorkflowService.Infrastructure.Persistence;
 using WorkflowService.Infrastructure.Repositories;
+using Shared.Infrastructure.Resilience;
 
 namespace WorkflowService.Infrastructure;
 
@@ -36,10 +37,31 @@ public static class DependencyInjection
         // SLA Job
         services.AddScoped<SlaCheckerJob>();
 
+        services.AddHttpClient("DocumentServiceClient",
+    client =>
+    {
+        client.BaseAddress = new Uri(
+            configuration["ServiceUrls:DocumentService"]
+            ?? "http://localhost:5002");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddResiliencePolicies("DocumentServiceClient");
+
+// Identity Service client
+services.AddHttpClient("IdentityServiceClient",
+    client =>
+    {
+        client.BaseAddress = new Uri(
+            configuration["ServiceUrls:IdentityService"]
+            ?? "http://localhost:5001");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddResiliencePolicies("IdentityServiceClient");
+
         // MassTransit + RabbitMQ
         services.AddMassTransit(x =>
         {
-            // Consumer — listens for document uploads
+            // Consumer ï¿½ listens for document uploads
             x.AddConsumer<DocumentUploadedConsumer>();
 
             x.UsingRabbitMq((context, cfg) =>

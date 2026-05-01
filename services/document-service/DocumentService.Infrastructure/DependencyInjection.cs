@@ -1,4 +1,4 @@
-using DocumentService.Application.Interfaces;
+﻿using DocumentService.Application.Interfaces;
 using DocumentService.Domain.Repositories;
 using DocumentService.Infrastructure.Messaging;
 using DocumentService.Infrastructure.Messaging.Consumers;
@@ -14,10 +14,12 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Minio;
 using Nest;
 using StackExchange.Redis;
 using Shared.Domain.Common;
+using Shared.Infrastructure.Resilience;
 
 namespace DocumentService.Infrastructure;
 
@@ -27,6 +29,19 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+
+        // MinIO HTTP client with resilience
+        services.AddHttpClient("MinioClient")
+        .AddResiliencePolicies("MinioClient");
+
+        // Elasticsearch HTTP client with resilience
+        services.AddHttpClient("ElasticsearchClient")
+    .AddPolicyHandler((sp, _) => {
+        var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+        var logger = loggerFactory.CreateLogger("ResiliencePolicies");
+        return ResiliencePolicies.GetCombinedPolicy(logger);
+    });
+
         // HTTP context accessor
         services.AddHttpContextAccessor();
 
@@ -68,6 +83,16 @@ public static class DependencyInjection
             DocumentRepository>();
         services.AddScoped<IDocumentReadRepository,
             DocumentReadRepository>();
+
+            // Resilience policies for HTTP clients
+
+        services.AddHttpClient("MinioClient")
+            .AddResiliencePolicies("MinioClient");
+
+            // Resilience policies for HTTP clients
+
+         services.AddHttpClient("ElasticsearchClient")
+            .AddResiliencePolicies("ElasticsearchClient");
 
         // MinIO client — singleton — thread safe
         services.AddSingleton<IMinioClient>(sp =>

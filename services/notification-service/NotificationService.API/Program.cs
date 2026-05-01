@@ -10,6 +10,9 @@ using Serilog;
 using Shared.Domain.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
+using Serilog.Enrichers.Span;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -113,6 +116,10 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "NotificationService.API");
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddSwaggerGen(c =>
@@ -170,6 +177,8 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();

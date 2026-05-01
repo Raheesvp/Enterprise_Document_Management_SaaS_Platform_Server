@@ -94,6 +94,7 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - SEQ_API_CANONICAL_URI=http://localhost:5341
+      - SEQ_FIRSTRUN_NOAUTHENTICATION=true
     ports:
       - "5341:5341"
       - "8081:80"

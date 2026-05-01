@@ -17,10 +17,16 @@ public class UploadDocumentCommandHandlerTests
     private readonly Mock<IPublishEndpoint> _publishEndpointMock = new();
 
     private readonly Mock<ISearchService> _searchServiceMock = new();
+    private readonly Mock<ICacheService> _cache = new();
 
     // 2. Updated to include the third parameter required by the constructor
     private UploadDocumentCommandHandler CreateHandler()
-        => new(_repo.Object, _storage.Object, _publishEndpointMock.Object,_searchServiceMock.Object);
+        => new UploadDocumentCommandHandler(
+            documentRepo:    _repo.Object,
+            storageService:  _storage.Object,
+            publishEndpoint: _publishEndpointMock.Object,
+            searchService:   _searchServiceMock.Object,
+            cache:           _cache.Object);
 
     [Fact]
     public async Task Handle_ValidCommand_ReturnsSuccessWithDocumentDto()

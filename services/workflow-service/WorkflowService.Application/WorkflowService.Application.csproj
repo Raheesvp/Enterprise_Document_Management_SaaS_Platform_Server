@@ -4,6 +4,7 @@
     <ProjectReference Include="..\WorkflowService.Domain\WorkflowService.Domain.csproj" />
     <ProjectReference Include="..\..\..\shared\Shared.Domain\Shared.Domain.csproj" />
     <ProjectReference Include="..\..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\shared\Shared.Infrastructure\Shared.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

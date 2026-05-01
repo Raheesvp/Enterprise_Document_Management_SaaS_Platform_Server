@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Serilog.Enrichers.Span;
 using Shared.Domain.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -11,6 +12,8 @@ using WorkflowService.Infrastructure;
 using WorkflowService.Infrastructure.Jobs;
 using WorkflowService.Infrastructure.Persistence;
 using WorkflowService.Infrastructure.Services;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +44,10 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddEndpointsApiExplorer();
+
+// Exception handling
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var jwtSecretKey = builder.Configuration["JwtSettings:SecretKey"]!;
 var jwtIssuer    = builder.Configuration["JwtSettings:Issuer"]!;
@@ -74,6 +81,10 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "DocumentService.API");
 
 builder.Services.AddAuthorization();
 
@@ -137,6 +148,8 @@ app.UseSwaggerUI(c =>
 app.UseHangfireDashboard("/hangfire");
 
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
