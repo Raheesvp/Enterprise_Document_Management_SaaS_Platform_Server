@@ -29,3 +29,6 @@ coverage/
 
 # Local working clone for backend repo (created by Codex)
 _server_repo/
+
+# npm caches (local)
+.npm-cache/
