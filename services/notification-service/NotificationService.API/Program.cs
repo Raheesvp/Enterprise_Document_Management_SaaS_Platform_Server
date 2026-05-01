@@ -10,6 +10,9 @@ using Serilog;
 using Shared.Domain.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
+using Serilog.Enrichers.Span;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +20,18 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+{
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .WriteTo.Console(
+            outputTemplate:
+                "[{Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(
+            context.Configuration["Seq:ServerUrl"]
+            ?? "http://localhost:5341");
+});
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -25,8 +39,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-
-// SignalR — real-time WebSocket connections
+// Exception handling
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+// SignalR ï¿½ real-time WebSocket connections
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors   = true;
@@ -34,7 +50,7 @@ builder.Services.AddSignalR(options =>
     options.ClientTimeoutInterval  = TimeSpan.FromSeconds(30);
 });
 
-// CORS — required for SignalR from Angular :4200
+// CORS ï¿½ required for SignalR from Angular :4200
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -80,7 +96,7 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 
-    // CRITICAL — SignalR sends JWT via query string
+    // CRITICAL ï¿½ SignalR sends JWT via query string
     // not Authorization header for WebSocket connections
     options.Events = new JwtBearerEvents
     {
@@ -99,6 +115,10 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
+
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "NotificationService.API");
 
 builder.Services.AddAuthorization();
 
@@ -157,6 +177,8 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();

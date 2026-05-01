@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using Serilog.Enrichers.Span;
 using Shared.Domain.Common;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
@@ -11,6 +12,8 @@ using WorkflowService.Infrastructure;
 using WorkflowService.Infrastructure.Jobs;
 using WorkflowService.Infrastructure.Persistence;
 using WorkflowService.Infrastructure.Services;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,7 +21,18 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+{
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .WriteTo.Console(
+            outputTemplate:
+                "[{Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(
+            context.Configuration["Seq:ServerUrl"]
+            ?? "http://localhost:5341");
+});
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -28,6 +42,10 @@ builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Exception handling
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var jwtSecretKey = builder.Configuration["JwtSettings:SecretKey"]!;
 var jwtIssuer    = builder.Configuration["JwtSettings:Issuer"]!;
@@ -61,6 +79,10 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 });
+
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "DocumentService.API");
 
 builder.Services.AddAuthorization();
 
@@ -124,6 +146,8 @@ app.UseSwaggerUI(c =>
 app.UseHangfireDashboard("/hangfire");
 
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

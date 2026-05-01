@@ -6,6 +6,8 @@ using WorkflowService.Application.DTOs;
 using WorkflowService.Application.Interfaces;
 using WorkflowService.Domain.Entities;
 using WorkflowService.Domain.Errors;
+using System.Diagnostics;
+using Shared.Infrastructure.Telemetry;
 
 namespace WorkflowService.Application.Commands.StartWorkflow;
 
@@ -28,6 +30,16 @@ public sealed class StartWorkflowCommandHandler
     StartWorkflowCommand request,
     CancellationToken cancellationToken)
 {
+
+
+    // Inside Handle():
+using var span = ActivitySources.Workflow
+    .StartActivity("workflow.start");
+
+span?.SetTag("document.id",  request.DocumentId.ToString());
+span?.SetTag("tenant.id",    request.TenantId.ToString());
+span?.SetTag("workflow.type", "DocumentApproval");
+
     // 1. Check if a workflow already exists for this document
     var workflow = await _repository.GetByDocumentIdAsync(
         request.DocumentId, 
@@ -56,7 +68,8 @@ public sealed class StartWorkflowCommandHandler
             request.DocumentTitle,
             request.InitiatedByUserId);
     }
-
+span?.SetTag("workflow.id", workflow.Id.ToString());
+span?.SetStatus(ActivityStatusCode.Ok);
     // 2. Add the stages (this works for both New and Reinitialized)
     foreach (var assignment in request.StageAssignments.OrderBy(s => s.StageOrder))
     {

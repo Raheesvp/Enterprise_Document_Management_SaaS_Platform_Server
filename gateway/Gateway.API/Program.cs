@@ -3,13 +3,29 @@ using Gateway.API.Middleware;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using Serilog.Enrichers.Span;
+using Shared.Infrastructure.Resilience;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
+using AspNetCoreRateLimit;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Logging ────────────────────────────────────────────────────────────────
 // Serilog structured logging — every log line has TenantId, RequestId etc.
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan() // ← THIS is the important part
+        .WriteTo.Console(
+            outputTemplate:
+                "[{Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(
+            context.Configuration["Seq:Endpoint"]
+            ?? "http://localhost:5341");
+});
 
 // ── YARP Reverse Proxy ─────────────────────────────────────────────────────
 // Reads route + cluster config from appsettings.json
@@ -21,12 +37,45 @@ builder.Services.AddReverseProxy()
 // JWT validated HERE at gateway — downstream services trust the headers
 builder.Services.AddGatewayAuthentication(builder.Configuration);
 
+
+builder.Services.AddAuthorization(options =>
+{
+    // Matches the "public-access" policy in your JSON
+    options.AddPolicy("public-access", policy => policy.RequireAssertion(_ => true));
+
+    // Matches the "authenticated" policy in your JSON
+    options.AddPolicy("authenticated", policy => policy.RequireAuthenticatedUser());
+});
+
 // ── Rate Limiting ──────────────────────────────────────────────────────────
 builder.Services.AddGatewayRateLimiting();
 
 // ── Health Checks ──────────────────────────────────────────────────────────
 builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
+
+// Exception handling
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "Gateway.API");
+
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(
+    builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IIpPolicyStore,
+    MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore,
+    MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration,
+    RateLimitConfiguration>();
+builder.Services.AddSingleton<IProcessingStrategy,
+    AsyncKeyLockProcessingStrategy>();
+builder.Services.AddInMemoryRateLimiting();
+
+
 
 
 builder.Services.AddSwaggerGen(c =>
@@ -77,6 +126,9 @@ builder.Services.AddCors(options =>
             .AllowCredentials());        
 });
 
+builder.Services.AddHttpClient("YARPClient")
+    .AddResiliencePolicies("YARPClient");
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -100,11 +152,19 @@ if (app.Environment.IsDevelopment())
 // 1. Serilog request logging — log every request
 app.UseSerilogRequestLogging();
 
+// 1.5 Global exception handler
+app.UseExceptionHandler();
+
 // 2. CORS — must be before auth
 app.UseCors("AllowFrontend");
 
+// 2.5 Security headers
+app.UseSecurityHeaders();
+
 // 3. Rate limiting — reject before spending auth resources
-app.UseRateLimiter();
+//app.UseRateLimiter();
+
+app.UseIpRateLimiting();
 
 // 4. Authentication — validate JWT
 app.UseAuthentication();

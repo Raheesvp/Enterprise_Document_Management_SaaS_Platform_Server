@@ -5,12 +5,26 @@ using IdentityService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Serilog;
+using Serilog.Enrichers.Span;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ── Logging ────────────────────────────────────────────────────
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .WriteTo.Console(
+            outputTemplate:
+                "[{Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(
+            context.Configuration["Seq:ServerUrl"]
+            ?? "http://localhost:5341");
+});
 
 // ── Application Services (MediatR, Validation, JWT) ───────────
 builder.Services.AddApplicationServices(builder.Configuration);
@@ -21,10 +35,17 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // ── Controllers ────────────────────────────────────────────────
 builder.Services.AddControllers();
 
+// ── Exception Handling ─────────────────────────────────────────
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 // ── Health Checks ──────────────────────────────────────────────
 builder.Services.AddHealthChecks()
     .AddSqlServer(builder.Configuration.GetConnectionString("IdentityDb")!);
 
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "IdentityService.API");
 
 
 // ── Swagger (Dev only) ─────────────────────────────────────────
@@ -65,6 +86,8 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowGateway", policy =>
@@ -104,7 +127,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseSerilogRequestLogging();             // 3. log requests
+app.UseSerilogRequestLogging();             // 2. log requests
+app.UseExceptionHandler();                  // 3. global exception handling
+app.UseSecurityHeaders();
 app.UseCors("AllowGateway");               // 4. CORS before auth
 app.UseAuthentication();                    // 5. validate JWT
 app.UseAuthorization();                     // 6. check permissions

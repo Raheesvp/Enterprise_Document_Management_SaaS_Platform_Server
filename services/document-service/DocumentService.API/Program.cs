@@ -8,6 +8,10 @@ using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using Shared.Infrastructure.Telemetry;
+using Shared.Infrastructure.Resilience;
+using Shared.Infrastructure.Security;
+using Serilog.Enrichers.Span;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,12 +20,35 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+{
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithSpan()
+        .WriteTo.Console(
+            outputTemplate:
+                "[{Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}")
+        .WriteTo.Seq(
+            context.Configuration["Seq:ServerUrl"]
+            ?? "http://localhost:5341");
+});
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Add HTTP clients with resilience policies
+builder.Services.AddHttpClient("MinioClient")
+    .AddResiliencePolicies("MinioClient");
+
+builder.Services.AddHttpClient("ElasticsearchClient")
+    .AddResiliencePolicies("ElasticsearchClient");
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Exception handling
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 var jwtSecretKey = builder.Configuration["JwtSettings:SecretKey"]!;
 var jwtIssuer    = builder.Configuration["JwtSettings:Issuer"]!;
@@ -31,7 +58,7 @@ Console.WriteLine($"[JWT CONFIG] Issuer:     {jwtIssuer}");
 Console.WriteLine($"[JWT CONFIG] Audience:   {jwtAudience}");
 Console.WriteLine($"[JWT CONFIG] Key length: {jwtSecretKey.Length}");
 
-// CRITICAL FIX — token has no kid so validator cannot match key
+// CRITICAL FIX ï¿½ token has no kid so validator cannot match key
 // Solution: disable kid validation entirely
 // Accept any key that successfully validates the signature
 var signingKey = new SymmetricSecurityKey(
@@ -59,8 +86,8 @@ builder.Services.AddAuthentication(options =>
         ValidAudience            = jwtAudience,
         ClockSkew                = TimeSpan.Zero,
 
-        // CRITICAL — bypass kid matching
-        // Token has no kid — resolve key manually
+        // CRITICAL ï¿½ bypass kid matching
+        // Token has no kid ï¿½ resolve key manually
         IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
         {
             Console.WriteLine($"[KEY RESOLVER] kid='{kid}'");
@@ -97,6 +124,9 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
+builder.Services.AddOpenTelemetryTracing(
+    builder.Configuration,
+    "DocumentService.API");
 
 builder.Services.AddAuthorization();
 
@@ -148,6 +178,18 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 }
 
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithSpan()              // â† Add this line
+    .WriteTo.Console(
+        outputTemplate:
+            "[{Level:u3}] {TraceId} {Message:lj}{NewLine}{Exception}")
+    .WriteTo.Seq(
+        builder.Configuration["Seq:Endpoint"]
+        ?? "http://localhost:5341")
+    .CreateLogger();
+
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -157,6 +199,8 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseSecurityHeaders();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

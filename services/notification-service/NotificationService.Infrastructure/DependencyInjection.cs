@@ -8,6 +8,7 @@ using NotificationService.Infrastructure.Persistence;
 using NotificationService.Infrastructure.Repositories;
 using NotificationService.Infrastructure.Services;
 using Microsoft.AspNetCore.SignalR;
+using Shared.Infrastructure.Resilience;
 
 namespace NotificationService.Infrastructure;
 
@@ -32,13 +33,28 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository,
             NotificationRepository>();
 
-        // Email service — singleton thread safe
+        // Email service ï¿½ singleton thread safe
         services.AddSingleton<IEmailService,
             MailKitEmailService>();
 
-        // SignalR broadcaster — scoped per request
+        // SignalR broadcaster ï¿½ scoped per request
         services.AddScoped<INotificationBroadcaster,
             NotificationBroadcaster>();
+
+        // MailKit SMTP client with resilience wrapper
+services.AddHttpClient("MailKitClient")
+    .AddResiliencePolicies("MailKitClient");
+
+// Workflow Service callback client
+services.AddHttpClient("WorkflowServiceClient",
+    client =>
+    {
+        client.BaseAddress = new Uri(
+            configuration["ServiceUrls:WorkflowService"]
+            ?? "http://localhost:5003");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddResiliencePolicies("WorkflowServiceClient");
 
         // MassTransit + RabbitMQ
         services.AddMassTransit(x =>
