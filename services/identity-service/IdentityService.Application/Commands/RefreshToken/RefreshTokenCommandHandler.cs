@@ -1,7 +1,7 @@
 using IdentityService.Application.DTOs;
 using IdentityService.Application.Interfaces;
-using IdentityService.Domain.Entities;
-using IdentityService.Domain.Errors;
+using IdentityService.Domain.Entities; // Required for RefreshToken entity
+using IdentityService.Domain.Errors;   // Required for IdentityErrors
 using IdentityService.Domain.Repositories;
 using MediatR;
 using Shared.Domain.Common;
@@ -27,50 +27,52 @@ public sealed class RefreshTokenCommandHandler
 
     public async Task<Result<AuthResponseDto>> Handle(
         RefreshTokenCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        // 1. Find user
-        var user = await _userRepo.GetByIdAsync(
-            command.UserId, cancellationToken);
+        // 1. Find user by ID (Newer version passes UserId in the command)
+        var user = await _userRepo.GetByIdAsync(command.UserId, ct);
 
         if (user is null)
             return Result.Failure<AuthResponseDto>(IdentityErrors.Token.Invalid);
 
-        // 2. Validate the refresh token
+        // 2. Validate the specific refresh token against the user's active tokens
         var activeToken = user.GetActiveRefreshToken(command.Token);
 
         if (activeToken is null)
             return Result.Failure<AuthResponseDto>(IdentityErrors.Token.Invalid);
 
-        // 3. Get tenant for JWT generation
-        var tenant = await _tenantRepo.GetByIdAsync(
-            user.TenantId, cancellationToken);
+        // 3. User status check
+        if (!user.IsActive)
+            return Result.Failure<AuthResponseDto>(IdentityErrors.User.Inactive);
+
+        // 4. Get and validate tenant
+        var tenant = await _tenantRepo.GetByIdAsync(user.TenantId, ct);
 
         if (tenant is null || !tenant.IsActive)
             return Result.Failure<AuthResponseDto>(IdentityErrors.Tenant.Inactive);
 
-        // 4. Rotate refresh token — revoke old, issue new
-        var newRefreshToken = _jwtService.GenerateRefreshToken();
+        // 5. ROTATION: Issue new refresh token entity
+        var newRefreshTokenStr = _jwtService.GenerateRefreshToken();
         var newRefreshTokenExpiry = _jwtService.GetRefreshTokenExpiry();
 
         var newRefreshTokenEntity = new IdentityService.Domain.Entities.RefreshToken(
             user.Id,
-            newRefreshToken,
+            newRefreshTokenStr,
             newRefreshTokenExpiry);
 
-        // AddRefreshToken internally revokes all existing tokens
+        // This method should handle revoking the 'activeToken' we used to get here
         user.AddRefreshToken(newRefreshTokenEntity);
 
-        await _userRepo.UpdateAsync(user, cancellationToken);
+        await _userRepo.UpdateAsync(user, ct);
 
-        // 5. Generate new access token
+        // 6. Generate access token and return full response
         var newAccessToken = _jwtService.GenerateAccessToken(user, tenant);
 
         return Result.Success(new AuthResponseDto(
-            newAccessToken,
-            newRefreshToken,
-            _jwtService.GetAccessTokenExpiry(),
-            new UserDto(
+            AccessToken: newAccessToken,
+            RefreshToken: newRefreshTokenStr,
+            AccessTokenExpiry: _jwtService.GetAccessTokenExpiry(),
+            User: new UserDto(
                 user.Id,
                 user.TenantId,
                 user.Email,

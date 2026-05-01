@@ -16,11 +16,24 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Shared.Infrastructure.Logging.SensitiveDataDestructuringPolicy>());
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddControllers();
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30MB
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
 var jwtSecretKey = builder.Configuration["JwtSettings:SecretKey"]!;
@@ -31,7 +44,7 @@ Console.WriteLine($"[JWT CONFIG] Issuer:     {jwtIssuer}");
 Console.WriteLine($"[JWT CONFIG] Audience:   {jwtAudience}");
 Console.WriteLine($"[JWT CONFIG] Key length: {jwtSecretKey.Length}");
 
-// CRITICAL FIX — token has no kid so validator cannot match key
+// CRITICAL FIX - token has no kid so validator cannot match key
 // Solution: disable kid validation entirely
 // Accept any key that successfully validates the signature
 var signingKey = new SymmetricSecurityKey(
@@ -59,8 +72,8 @@ builder.Services.AddAuthentication(options =>
         ValidAudience            = jwtAudience,
         ClockSkew                = TimeSpan.Zero,
 
-        // CRITICAL — bypass kid matching
-        // Token has no kid — resolve key manually
+        // CRITICAL - bypass kid matching
+        // Token has no kid - resolve key manually
         IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
         {
             Console.WriteLine($"[KEY RESOLVER] kid='{kid}'");

@@ -10,3 +10,16 @@ C:\Projects\ProjectSaas\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Inf
 C:\Projects\ProjectSaas\shared\Shared.Infrastructure\obj\Debug\net8.0\refint\Shared.Infrastructure.dll
 C:\Projects\ProjectSaas\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.pdb
 C:\Projects\ProjectSaas\shared\Shared.Infrastructure\obj\Debug\net8.0\ref\Shared.Infrastructure.dll
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.AssemblyInfoInputs.cache
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.AssemblyInfo.cs
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.csproj.CoreCompileInputs.cache
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.sourcelink.json
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.dll
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\refint\Shared.Infrastructure.dll
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.pdb
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\bin\Debug\net8.0\Shared.Infrastructure.deps.json
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\bin\Debug\net8.0\Shared.Infrastructure.dll
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\bin\Debug\net8.0\Shared.Infrastructure.pdb
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\Shared.Infrastructure.csproj.AssemblyReference.cache
+C:\Users\DELL\Desktop\ProjectSaaS\shared\Shared.Infrastructure\obj\Debug\net8.0\ref\Shared.Infrastructure.dll

@@ -17,16 +17,29 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Shared.Infrastructure.Logging.SensitiveDataDestructuringPolicy>());
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 builder.Services.AddControllers();
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30MB
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
-// SignalR — real-time WebSocket connections
+// SignalR - real-time WebSocket connections
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors   = true;
@@ -34,7 +47,7 @@ builder.Services.AddSignalR(options =>
     options.ClientTimeoutInterval  = TimeSpan.FromSeconds(30);
 });
 
-// CORS — required for SignalR from Angular :4200
+// CORS - required for SignalR from Angular :4200
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -80,7 +93,7 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero
     };
 
-    // CRITICAL — SignalR sends JWT via query string
+    // CRITICAL - SignalR sends JWT via query string
     // not Authorization header for WebSocket connections
     options.Events = new JwtBearerEvents
     {

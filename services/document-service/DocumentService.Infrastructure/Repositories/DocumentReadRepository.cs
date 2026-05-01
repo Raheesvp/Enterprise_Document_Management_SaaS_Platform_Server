@@ -116,58 +116,7 @@ public sealed class DocumentReadRepository : IDocumentReadRepository
         DocumentQueryFilter filter,
         CancellationToken ct = default)
     {
-        var conditions = new List<string>
-        {
-            "d.tenant_id = @TenantId",
-        };
-
-        // Only hide archived if status filter not explicitly set
-        if (!filter.Status.HasValue)
-            conditions.Add("d.status != 'Archived'");
-
-        var parameters = new DynamicParameters();
-        parameters.Add("TenantId", tenantId);
-        parameters.Add("Offset", (filter.Page - 1) * filter.PageSize);
-        parameters.Add("PageSize", filter.PageSize);
-
-        if (filter.Status.HasValue)
-        {
-            conditions.Add("d.status = @Status");
-            parameters.Add("Status", filter.Status.Value.ToString());
-        }
-
-        if (filter.Type.HasValue)
-        {
-            conditions.Add("d.document_type = @DocumentType");
-            parameters.Add("DocumentType", filter.Type.Value.ToString());
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
-        {
-            conditions.Add("d.title ILIKE @SearchTerm");
-            parameters.Add("SearchTerm", $"%{filter.SearchTerm}%");
-        }
-
-        if (filter.FromDate.HasValue)
-        {
-            conditions.Add("d.created_at >= @FromDate");
-            parameters.Add("FromDate", filter.FromDate.Value);
-        }
-
-        if (filter.ToDate.HasValue)
-        {
-            conditions.Add("d.created_at <= @ToDate");
-            parameters.Add("ToDate", filter.ToDate.Value);
-        }
-
-        var whereClause = string.Join(" AND ", conditions);
-
-        var countSql = $@"
-            SELECT COUNT(*)
-            FROM documents d
-            WHERE {whereClause}";
-
-        var dataSql = $@"
+        var sql = @"
             SELECT
                 d.id                    AS Id,
                 d.tenant_id             AS TenantId,
@@ -190,7 +139,13 @@ public sealed class DocumentReadRepository : IDocumentReadRepository
                 AND dv.is_current_version = true
             LEFT JOIN document_versions dv2
                 ON dv2.document_id = d.id
-            WHERE {whereClause}
+            WHERE d.tenant_id = @TenantId
+              AND (@Status IS NULL OR d.status = @Status)
+              AND (@DocumentType IS NULL OR d.document_type = @DocumentType)
+              AND (@SearchTerm IS NULL OR d.title ILIKE @SearchPattern)
+              AND (@FromDate IS NULL OR d.created_at >= @FromDate)
+              AND (@ToDate IS NULL OR d.created_at <= @ToDate)
+              AND (@ExcludeArchived = false OR d.status != 'Archived')
             GROUP BY
                 d.id, d.tenant_id, d.title, d.status,
                 d.document_type, d.mime_type,
@@ -200,15 +155,38 @@ public sealed class DocumentReadRepository : IDocumentReadRepository
             ORDER BY d.created_at DESC
             LIMIT @PageSize OFFSET @Offset";
 
+        var countSql = @"
+            SELECT COUNT(*)
+            FROM documents d
+            WHERE d.tenant_id = @TenantId
+              AND (@Status IS NULL OR d.status = @Status)
+              AND (@DocumentType IS NULL OR d.document_type = @DocumentType)
+              AND (@SearchTerm IS NULL OR d.title ILIKE @SearchPattern)
+              AND (@FromDate IS NULL OR d.created_at >= @FromDate)
+              AND (@ToDate IS NULL OR d.created_at <= @ToDate)
+              AND (@ExcludeArchived = false OR d.status != 'Archived')";
+
+        var parameters = new
+        {
+            TenantId        = tenantId,
+            Status          = filter.Status?.ToString(),
+            DocumentType    = filter.Type?.ToString(),
+            SearchTerm      = filter.SearchTerm,
+            SearchPattern   = $"%{filter.SearchTerm}%",
+            FromDate        = filter.FromDate,
+            ToDate          = filter.ToDate,
+            ExcludeArchived = !filter.Status.HasValue,
+            PageSize        = filter.PageSize,
+            Offset          = (filter.Page - 1) * filter.PageSize
+        };
+
         await using var connection = CreateConnection();
 
         var totalCount = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition(countSql, parameters,
-                cancellationToken: ct));
+            new CommandDefinition(countSql, parameters, cancellationToken: ct));
 
         var rows = await connection.QueryAsync<DocumentSummaryRow>(
-            new CommandDefinition(dataSql, parameters,
-                cancellationToken: ct));
+            new CommandDefinition(sql, parameters, cancellationToken: ct));
 
         var items = rows.Select(r => r.ToSummary())
             .ToList().AsReadOnly();
@@ -217,11 +195,10 @@ public sealed class DocumentReadRepository : IDocumentReadRepository
             items, totalCount, filter.Page, filter.PageSize);
     }
 
-    public async Task<IReadOnlyList<DocumentVersionSummary>>
-        GetVersionsAsync(
-            Guid documentId,
-            Guid tenantId,
-            CancellationToken ct = default)
+    public async Task<IReadOnlyList<DocumentVersionSummary>> GetVersionsAsync(
+        Guid documentId,
+        Guid tenantId,
+        CancellationToken ct = default)
     {
         const string sql = @"
             SELECT
@@ -253,6 +230,3 @@ public sealed class DocumentReadRepository : IDocumentReadRepository
             .ToList().AsReadOnly();
     }
 }
-
-
-

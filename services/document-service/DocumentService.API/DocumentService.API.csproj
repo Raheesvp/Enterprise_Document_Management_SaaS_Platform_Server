@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\DocumentService.Application\DocumentService.Application.csproj" />
     <ProjectReference Include="..\DocumentService.Infrastructure\DocumentService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\shared\Shared.Infrastructure\Shared.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

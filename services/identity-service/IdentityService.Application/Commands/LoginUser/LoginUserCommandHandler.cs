@@ -5,6 +5,8 @@ using IdentityService.Domain.Errors;
 using IdentityService.Domain.Repositories;
 using MediatR;
 using Shared.Domain.Common;
+using Microsoft.Extensions.Logging;
+using Shared.Infrastructure.Extensions;
 
 namespace IdentityService.Application.Commands.LoginUser;
 
@@ -15,17 +17,23 @@ public sealed class LoginUserCommandHandler
     private readonly ITenantRepository _tenantRepo;
     private readonly IPasswordService _passwordService;
     private readonly IJwtService _jwtService;
+    private readonly ILogger<LoginUserCommandHandler> _logger;
+    private readonly Microsoft.AspNetCore.Http.IHttpContextAccessor _httpContextAccessor;
 
     public LoginUserCommandHandler(
         IUserRepository userRepo,
         ITenantRepository tenantRepo,
         IPasswordService passwordService,
-        IJwtService jwtService)
+        IJwtService jwtService,
+        ILogger<LoginUserCommandHandler> logger,
+        Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor)
     {
         _userRepo = userRepo;
         _tenantRepo = tenantRepo;
         _passwordService = passwordService;
         _jwtService = jwtService;
+        _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     //email doesnot exist or password is wrong, we return the same error to prevent attackers from knowing which part is incorrect.
@@ -40,12 +48,12 @@ public sealed class LoginUserCommandHandler
             command.Subdomain, cancellationToken);
 
         if (tenant is null)
-            return Result.Failure<AuthResponseDto>(
-                IdentityErrors.User.InvalidCredentials);
+            return LogAndReturnFailure(command, Result.Failure<AuthResponseDto>(
+                IdentityErrors.User.InvalidCredentials));
 
         if (!tenant.IsActive)
-            return Result.Failure<AuthResponseDto>(
-                IdentityErrors.Tenant.Inactive);
+            return LogAndReturnFailure(command, Result.Failure<AuthResponseDto>(
+                IdentityErrors.Tenant.Inactive));
 
         // 2. Find user within this tenant
         var user = await _userRepo.GetByEmailAsync(
@@ -55,12 +63,12 @@ public sealed class LoginUserCommandHandler
         // Prevents timing attacks revealing whether email exists
         if (user is null || !_passwordService.VerifyPassword(
                 command.Password, user.PasswordHash))
-            return Result.Failure<AuthResponseDto>(
-                IdentityErrors.User.InvalidCredentials);
+            return LogAndReturnFailure(command, Result.Failure<AuthResponseDto>(
+                IdentityErrors.User.InvalidCredentials));
 
         if (!user.IsActive)
-            return Result.Failure<AuthResponseDto>(
-                IdentityErrors.User.Inactive);
+            return LogAndReturnFailure(command, Result.Failure<AuthResponseDto>(
+                IdentityErrors.User.Inactive));
 
         // 3. Generate tokens
         var accessToken = _jwtService.GenerateAccessToken(user, tenant);
@@ -79,7 +87,7 @@ public sealed class LoginUserCommandHandler
         await _userRepo.UpdateAsync(user, cancellationToken);
 
         // 5. Return auth response
-        return Result.Success(new AuthResponseDto(
+        var result = Result.Success(new AuthResponseDto(
             accessToken,
             refreshToken,
             _jwtService.GetAccessTokenExpiry(),
@@ -89,5 +97,30 @@ public sealed class LoginUserCommandHandler
                 user.Email,
                 user.FullName,
                 user.Role.ToString())));
+
+        _logger.LogInformation(
+            "[SECURITY] Successful login. " +
+            "UserId: {UserId} TenantId: {TenantId}",
+            user.Id, tenant.Id);
+
+        return result;
+    }
+
+    private Result<AuthResponseDto> LogAndReturnFailure(
+        LoginUserCommand command, 
+        Result<AuthResponseDto> result)
+    {
+        _logger.LogWarning(
+            "[SECURITY] Failed login attempt. " +
+            "Email: {Email} Subdomain: {Subdomain} " +
+            "Reason: {Reason} IP: {IP}",
+            command.Email.MaskEmail(),
+            command.Subdomain,
+            result.Error.Description,
+            _httpContextAccessor.HttpContext?
+                .Connection.RemoteIpAddress?.ToString()
+                ?? "unknown");
+
+        return result;
     }
 }

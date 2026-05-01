@@ -1,4 +1,4 @@
-﻿using Hangfire;
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -18,7 +18,9 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 builder.Host.UseSerilog((context, config) =>
-    config.ReadFrom.Configuration(context.Configuration));
+    config
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Shared.Infrastructure.Logging.SensitiveDataDestructuringPolicy>());
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -27,6 +29,17 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
 
 builder.Services.AddControllers();
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30MB
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
 var jwtSecretKey = builder.Configuration["JwtSettings:SecretKey"]!;
@@ -120,7 +133,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-// Hangfire dashboard — view background jobs
+// Hangfire dashboard - view background jobs
 app.UseHangfireDashboard("/hangfire");
 
 app.UseSerilogRequestLogging();
@@ -129,7 +142,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// Schedule SLA checker — runs every 5 minutes
+// Schedule SLA checker - runs every 5 minutes
 RecurringJob.AddOrUpdate<SlaCheckerJob>(
     recurringJobId: "sla-checker",
     methodCall:     job => job.ExecuteAsync(),

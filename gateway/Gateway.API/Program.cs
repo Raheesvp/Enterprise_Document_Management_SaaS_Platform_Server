@@ -9,7 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 // ── Logging ────────────────────────────────────────────────────────────────
 // Serilog structured logging — every log line has TenantId, RequestId etc.
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Shared.Infrastructure.Logging.SensitiveDataDestructuringPolicy>());
 
 // ── YARP Reverse Proxy ─────────────────────────────────────────────────────
 // Reads route + cluster config from appsettings.json
@@ -65,16 +67,41 @@ c.AddSecurityRequirement(new OpenApiSecurityRequirement
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
+    {
         policy
             .WithOrigins(
                 "http://localhost:4200",
-                "http://localhost:3000",  
-                "http://localhost:5173",
-                "http://localhost:5000"  // Vite dev server
-                )  // Vite dev server
-            .AllowAnyHeader()
+                "https://localhost:4200")
             .AllowAnyMethod()
-            .AllowCredentials());        
+            .AllowAnyHeader()
+            .AllowCredentials()
+            .WithExposedHeaders(
+                "traceparent",
+                "tracestate",
+                "X-Trace-Id");
+    });
+
+    options.AddPolicy("AllowFrontendStrict", policy =>
+    {
+        policy
+            .WithOrigins("https://yourdomain.com") // Placeholder for production
+            .WithMethods("GET", "POST", "PUT", "DELETE")
+            .WithHeaders(
+                "Authorization",
+                "Content-Type",
+                "X-Requested-With")
+            .AllowCredentials();
+    });
+});
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30MB
 });
 
 var app = builder.Build();

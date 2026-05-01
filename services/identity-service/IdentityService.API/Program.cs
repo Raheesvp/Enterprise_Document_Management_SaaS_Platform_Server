@@ -10,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ── Logging ────────────────────────────────────────────────────
 builder.Host.UseSerilog((context, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Shared.Infrastructure.Logging.SensitiveDataDestructuringPolicy>());
 
 // ── Application Services (MediatR, Validation, JWT) ───────────
 builder.Services.AddApplicationServices(builder.Configuration);
@@ -20,6 +22,17 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // ── Controllers ────────────────────────────────────────────────
 builder.Services.AddControllers();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 52_428_800; // 50MB
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024; // 30MB
+});
 
 // ── Health Checks ──────────────────────────────────────────────
 builder.Services.AddHealthChecks()
