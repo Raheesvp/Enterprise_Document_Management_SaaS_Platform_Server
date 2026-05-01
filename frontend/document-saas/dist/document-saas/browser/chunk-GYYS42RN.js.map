@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/auth/auth.routes.ts"],
+  "sourcesContent": ["import { Routes } from \"@angular/router\";\n\nexport const AUTH_ROUTES: Routes = [\n  {\n    path: \"\",\n    redirectTo: \"login\",\n    pathMatch: \"full\",\n  },\n  {\n    path: \"login\",\n    loadComponent: () =>\n      import(\"./login/login.component\").then(\n        (m) => m.LoginComponent\n      ),\n  },\n  {\n    path: \"register\",\n    loadComponent: () =>\n      import(\"./register/register.component\").then(\n        (m) => m.RegisterComponent\n      ),\n  },\n];\r\n"],
+  "mappings": ";;;AAEO,IAAM,cAAsB;EACjC;IACE,MAAM;IACN,YAAY;IACZ,WAAW;;EAEb;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAAyB,EAAE,KAChC,CAAC,MAAM,EAAE,cAAc;;EAG7B;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAA+B,EAAE,KACtC,CAAC,MAAM,EAAE,iBAAiB;;;",
+  "names": []
+}

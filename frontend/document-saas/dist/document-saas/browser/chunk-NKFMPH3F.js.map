@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/workflow/workflow.routes.ts"],
+  "sourcesContent": ["import { Routes } from \"@angular/router\";\n\nexport const WORKFLOW_ROUTES: Routes = [\n  {\n    path: \"\",\n    loadComponent: () =>\n      import(\"./workflow-list/workflow-list.component\").then(\n        (m) => m.WorkflowListComponent\n      ),\n  },\n  {\n    path: \":id\",\n    loadComponent: () =>\n      import(\"./workflow-detail/workflow-detail.component\").then(\n        (m) => m.WorkflowDetailComponent\n      ),\n  },\n];\r\n"],
+  "mappings": ";;;AAEO,IAAM,kBAA0B;EACrC;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAAyC,EAAE,KAChD,CAAC,MAAM,EAAE,qBAAqB;;EAGpC;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAA6C,EAAE,KACpD,CAAC,MAAM,EAAE,uBAAuB;;;",
+  "names": []
+}

@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["shell.component.ts"],
+  "sourcesContent": ["\n    .shell-container {\n      height: 100vh;\n    }\n    .sidenav {\n      width: 260px;\n      border-right: 1px solid #E2E8F0;\n      background: white;\n    }\n    .main-content {\n      display: flex;\n      flex-direction: column;\n      height: 100vh;\n      background: #F8FAFC;\n    }\n    .page-content {\n      flex: 1;\n      overflow-y: auto;\n      padding: 0;\n    }\n  "],
+  "mappings": ";AACI,CAAA;AACE,UAAA;;AAEF,CAAA;AACE,SAAA;AACA,gBAAA,IAAA,MAAA;AACA,cAAA;;AAEF,CAAA;AACE,WAAA;AACA,kBAAA;AACA,UAAA;AACA,cAAA;;AAEF,CAAA;AACE,QAAA;AACA,cAAA;AACA,WAAA;;",
+  "names": []
+}

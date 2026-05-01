@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/documents/documents.routes.ts"],
+  "sourcesContent": ["import { Routes } from \"@angular/router\";\n\nexport const DOCUMENT_ROUTES: Routes = [\n  {\n    path: \"\",\n    loadComponent: () =>\n      import(\"./document-list/document-list.component\").then(\n        (m) => m.DocumentListComponent\n      ),\n  },\n  {\n    path: \"upload\",\n    loadComponent: () =>\n      import(\"./upload/upload.component\").then(\n        (m) => m.UploadComponent\n      ),\n  },\n  {\n    path: \":id\",\n    loadComponent: () =>\n      import(\"./document-detail/document-detail.component\").then(\n        (m) => m.DocumentDetailComponent\n      ),\n  },\n];\r\n"],
+  "mappings": ";;;AAEO,IAAM,kBAA0B;EACrC;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAAyC,EAAE,KAChD,CAAC,MAAM,EAAE,qBAAqB;;EAGpC;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAA2B,EAAE,KAClC,CAAC,MAAM,EAAE,eAAe;;EAG9B;IACE,MAAM;IACN,eAAe,MACb,OAAO,qBAA6C,EAAE,KACpD,CAAC,MAAM,EAAE,uBAAuB;;;",
+  "names": []
+}
