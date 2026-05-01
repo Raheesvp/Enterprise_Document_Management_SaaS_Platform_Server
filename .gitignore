@@ -23,3 +23,6 @@ Thumbs.db
 # Test results
 TestResults/
 coverage/
+
+# Local working clone for backend repo (created by Codex)
+_server_repo/
